@@ -3,14 +3,9 @@ import { supabase } from "../lib/supabase";
 import HealthBanner from "./HealthBanner";
 
 const links: [string, string][] = [
-  ["/", "Resumen del mes"],
-  ["/tendencia", "Tendencia mensual"],
-  ["/comercios", "Top comercios"],
-  ["/categorias", "Por categoría"],
-  ["/canal", "Por canal"],
+  ["/", "Resumen"],
+  ["/analisis", "Análisis"],
   ["/transacciones", "Transacciones"],
-  ["/revisar", "Por revisar"],
-  ["/recibido", "Dinero recibido"],
   ["/insights", "Recomendaciones"],
   ["/ajustes", "Ajustes"],
 ];

@@ -1,17 +1,12 @@
 import { useEffect, useState } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
 import Layout from "./components/Layout";
 import Resumen from "./pages/Resumen";
-import Tendencia from "./pages/Tendencia";
-import TopComercios from "./pages/TopComercios";
-import PorCategoria from "./pages/PorCategoria";
-import PorCanal from "./pages/PorCanal";
+import Analisis from "./pages/Analisis";
 import Transacciones from "./pages/Transacciones";
-import PorRevisar from "./pages/PorRevisar";
-import Recibido from "./pages/Recibido";
 import Insights from "./pages/Insights";
 import Ajustes from "./pages/Ajustes";
 
@@ -35,15 +30,18 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Resumen />} />
-        <Route path="/tendencia" element={<Tendencia />} />
-        <Route path="/comercios" element={<TopComercios />} />
-        <Route path="/categorias" element={<PorCategoria />} />
-        <Route path="/canal" element={<PorCanal />} />
+        <Route path="/analisis" element={<Analisis />} />
         <Route path="/transacciones" element={<Transacciones />} />
-        <Route path="/revisar" element={<PorRevisar />} />
-        <Route path="/recibido" element={<Recibido />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/ajustes" element={<Ajustes />} />
+        {/* Rutas antiguas → redirigen a las nuevas vistas consolidadas */}
+        <Route path="/tendencia" element={<Navigate to="/analisis" replace />} />
+        <Route path="/comercios" element={<Navigate to="/analisis" replace />} />
+        <Route path="/categorias" element={<Navigate to="/analisis" replace />} />
+        <Route path="/canal" element={<Navigate to="/analisis" replace />} />
+        <Route path="/revisar" element={<Navigate to="/transacciones" replace />} />
+        <Route path="/recibido" element={<Navigate to="/transacciones" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

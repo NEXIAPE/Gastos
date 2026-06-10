@@ -128,6 +128,16 @@ function parseAmount(str) {
   return isFinite(f) ? f : null;
 }
 
+// Estado a partir del ASUNTO (limpio), no del cuerpo (que trae pies de página
+// legales con palabras como "devolución" que causarían falsos reembolsos).
+function statusFromSubject(subject) {
+  var s = (subject || '').toLowerCase();
+  if (/rechaz|denegad|no procesada/.test(s)) return 'declined';
+  if (/extorno|anulaci|reverso|reversad/.test(s)) return 'reversed';
+  if (/reembolso|devoluci/.test(s)) return 'refunded';
+  return 'confirmed';
+}
+
 function detectCurrency(str) {
   if (!str) return 'PEN';
   if (/US\$|USD|\$\s*\d/.test(str)) return 'USD';
@@ -195,7 +205,8 @@ var TEMPLATES = {
     return {
       source: 'email_yape',
       channel: 'yape',
-      // direction/status los infiere el endpoint del `text` (pagaste/te yapearon/etc.)
+      // direction la infiere el endpoint del `text` (pagaste/te yapearon/etc.).
+      status: statusFromSubject(subject),
       occurred_at: toIsoLima(date),
       merchant: who ? who[1].trim() : 'Yape',
       counterparty: who ? who[1].trim() : null,
@@ -219,6 +230,9 @@ var TEMPLATES = {
     return {
       source: bank === 'interbank' ? 'email_interbank' : 'email_bcp',
       channel: 'plin',
+      direction: 'out', // "Realizaste un consumo" = pago saliente (el endpoint lo
+                        // reclasifica a 'transfer' si la contraparte eres tú).
+      status: statusFromSubject(subject),
       occurred_at: toIsoLima(date),
       merchant: who ? who[1].trim() : 'Plin',
       counterparty: who ? who[1].trim() : null,
@@ -242,6 +256,8 @@ var TEMPLATES = {
     return {
       source: 'email_interbank',
       channel: 'tarjeta',
+      direction: 'out',
+      status: statusFromSubject(subject),
       occurred_at: toIsoLima(date),
       merchant: merch ? merch[1].trim() : (subject || 'Interbank'),
       amount: amountM ? parseAmount(amountM[1]) : 0,
@@ -266,6 +282,8 @@ var TEMPLATES = {
     return {
       source: 'email_bcp',
       channel: 'tarjeta',
+      direction: 'out',
+      status: statusFromSubject(subject),
       occurred_at: toIsoLima(date),
       merchant: merch ? merch[1].trim() : (subject || 'BCP'),
       amount: amountM ? parseAmount(amountM[1]) : 0,

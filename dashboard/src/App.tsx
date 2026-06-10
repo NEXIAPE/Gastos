@@ -7,6 +7,7 @@ import Layout from "./components/Layout";
 import Resumen from "./pages/Resumen";
 import Analisis from "./pages/Analisis";
 import Transacciones from "./pages/Transacciones";
+import Presupuestos from "./pages/Presupuestos";
 import Insights from "./pages/Insights";
 import Ajustes from "./pages/Ajustes";
 
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/" element={<Resumen />} />
         <Route path="/analisis" element={<Analisis />} />
         <Route path="/transacciones" element={<Transacciones />} />
+        <Route path="/presupuestos" element={<Presupuestos />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/ajustes" element={<Ajustes />} />
         {/* Rutas antiguas → redirigen a las nuevas vistas consolidadas */}

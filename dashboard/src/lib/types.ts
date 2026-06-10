@@ -90,6 +90,15 @@ export const GROUP_COLOR: Record<ExpenseGroup, string> = {
 
 export const groupOf = (cat: string): ExpenseGroup => CATEGORY_GROUP[cat] ?? "Otros";
 
+export interface Budget {
+  id: string;
+  category: string;
+  amount_pen: number;
+  period: string;
+  active: boolean;
+  created_at: string;
+}
+
 export const CHANNELS: Channel[] = ["apple_pay", "yape", "plin", "tarjeta", "efectivo"];
 export const DIRECTIONS: Direction[] = ["out", "in", "transfer"];
 export const STATUSES: Status[] =

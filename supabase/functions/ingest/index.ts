@@ -40,6 +40,7 @@ interface IngestBody {
   merchant?: string;
   amount?: number | string;
   currency?: string;
+  category?: string; // categoría explícita (ej. atajo manual con selector)
   card_label?: string;
   counterparty?: string;
   external_ref?: string;
@@ -134,8 +135,12 @@ Deno.serve(async (req) => {
     amount_pen = Number(amount.toFixed(2));
   }
 
+  // Categoría: si el evento trae una explícita (ej. atajo manual con selector),
+  // se respeta; si no, se asigna por reglas de comercio.
   const rules = await getRules();
-  const category = categorize(merchant_clean, rules);
+  const category = (body.category && body.category.trim())
+    ? body.category.trim()
+    : categorize(merchant_clean, rules);
   const occurred_at = body.occurred_at ?? new Date().toISOString();
 
   const row = {

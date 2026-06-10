@@ -127,3 +127,33 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px
 .tab { border: none; background: none; padding: 7px 16px; border-radius: 8px; font-size: 14px; color: var(--muted); }
 .tab.active { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(16,24,40,.08); }
 .month-nav .field, .page-head .field { margin-bottom: 0; }
+
+/* Tablas con scroll horizontal en pantallas chicas */
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll table { min-width: 560px; }
+
+/* =========================================================
+   RESPONSIVE / MÓVIL (Safari iPhone, etc.)
+   ========================================================= */
+@media (max-width: 760px) {
+  .app { flex-direction: column; }
+  .sidebar {
+    width: 100%; height: auto; position: sticky; top: 0; z-index: 30;
+    border-right: none; border-bottom: 1px solid var(--line); padding: 10px 0 0;
+    display: flex; flex-direction: column;
+  }
+  .sidebar h1 { padding: 0 16px 8px; font-size: 17px; }
+  .nav { display: flex; overflow-x: auto; gap: 4px; padding: 0 10px; -webkit-overflow-scrolling: touch; }
+  .nav a {
+    white-space: nowrap; border-left: none; border-bottom: 3px solid transparent;
+    padding: 8px 12px; border-radius: 8px 8px 0 0;
+  }
+  .nav a.active { border-left: none; border-bottom-color: var(--brand); }
+  .sidebar > div { padding: 8px 16px !important; }
+  .main { padding: 16px 14px; max-width: 100%; }
+  .kpi-value { font-size: 23px; }
+  .page-head { gap: 8px; }
+  .filters .field { flex: 1 1 45%; }
+  .modal { padding: 18px; }
+}
+

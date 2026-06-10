@@ -20,6 +20,7 @@ export default function TxnTable({ rows, onChange }: { rows: Transaction[]; onCh
 
   return (
     <>
+      <div className="table-scroll">
       <table>
         <thead>
           <tr>
@@ -47,6 +48,7 @@ export default function TxnTable({ rows, onChange }: { rows: Transaction[]; onCh
           ))}
         </tbody>
       </table>
+      </div>
       {editing && (
         <EditTxnModal
           txn={editing}

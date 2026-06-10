@@ -133,7 +133,8 @@ function RulesCard() {
           await addRule(match.trim(), category, Number(priority)); setMatch(""); load();
         }}>Añadir</button>
       </div>
-      <table style={{ marginTop: 12 }}>
+      <div className="table-scroll" style={{ marginTop: 12 }}>
+      <table>
         <thead><tr><th>Texto</th><th>Categoría</th><th className="num">Prioridad</th><th></th></tr></thead>
         <tbody>
           {rules.map((r) => (
@@ -144,6 +145,7 @@ function RulesCard() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

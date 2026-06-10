@@ -84,3 +84,40 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px
 .muted { color: var(--muted); }
 .markdown { font-size: 14px; line-height: 1.6; }
 .markdown ul { padding-left: 20px; }
+
+/* ---- Encabezado de página con navegación de mes ---- */
+.page-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.page-head .page { margin: 0; }
+.month-nav { display: flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.month-nav button { border: none; background: none; font-size: 18px; line-height: 1; padding: 4px 12px; border-radius: 8px; color: var(--ink); }
+.month-nav button:hover:not(:disabled) { background: #f3f4f6; }
+.month-label { font-weight: 600; font-size: 14px; min-width: 120px; text-align: center; text-transform: capitalize; }
+
+/* ---- KPI grid ---- */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.kpi {
+  background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--brand);
+  border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+}
+.kpi-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.kpi-icon { font-size: 18px; }
+.kpi-label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.kpi-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.kpi-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+/* ---- Barra apilada por tipo de gasto ---- */
+.groupbar { display: flex; height: 28px; border-radius: 8px; overflow: hidden; background: #f3f4f6; }
+.groupbar-seg { transition: width .3s ease; }
+.groupbar-seg:not(:last-child) { border-right: 2px solid #fff; }
+.grouplegend { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 18px; margin-top: 14px; }
+.grouplegend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.grouplegend .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.grouplegend-name { color: var(--ink); }
+.grouplegend-val { margin-left: auto; font-weight: 600; }
+
+/* ---- Grid de 2 columnas responsivo ---- */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* Refinamiento general de tarjetas */
+.card { box-shadow: 0 1px 2px rgba(16,24,40,.04); }

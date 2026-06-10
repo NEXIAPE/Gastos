@@ -88,19 +88,30 @@ function parseMessage(msg) {
   var date = msg.getDate(); // Date del correo
   var messageId = msg.getId();
 
-  if (from.indexOf('yape') !== -1 || subject.toLowerCase().indexOf('yape') !== -1) {
+  // Buscamos pistas en remitente + asunto + cuerpo. Esto resiste el reenvío de
+  // iCloud (que a veces reescribe el "De:"): aunque el remitente cambie, el
+  // asunto/cuerpo conservan "Interbank" / "BCP" / "Yape".
+  var hay = (from + ' ' + subject + ' ' + body).toLowerCase();
+
+  // Yape primero (su correo es inconfundible).
+  if (hay.indexOf('yape') !== -1) {
     return TEMPLATES.yape(body, subject, date, messageId);
   }
-  if (subject.toLowerCase().indexOf('plin') !== -1 || body.toLowerCase().indexOf('plin') !== -1) {
-    return TEMPLATES.plin(body, subject, date, messageId, from);
-  }
-  if (from.indexOf('interbank') !== -1) {
-    return TEMPLATES.interbank(body, subject, date, messageId);
-  }
-  if (from.indexOf('bcp') !== -1 || from.indexOf('viabcp') !== -1) {
-    return TEMPLATES.bcp(body, subject, date, messageId);
-  }
-  return null; // desconocido
+
+  // ¿Qué banco es? (netinterbank.com.pe contiene "interbank"; notificacionesbcp contiene "bcp")
+  var bank = (hay.indexOf('interbank') !== -1) ? 'interbank'
+           : ((hay.indexOf('bcp') !== -1 || hay.indexOf('viabcp') !== -1) ? 'bcp' : null);
+  if (!bank) return null; // desconocido → irá a "Por revisar"
+
+  // ¿Es un Plin? Marcador fuerte en el CUERPO ("PLIN-Nombre" / "Empresa PLIN").
+  // OJO: no usamos "plin" suelto porque los correos de Interbank mencionan
+  // "plin.pe" en el pie de página de seguridad (falso positivo).
+  var isPlin = /plin\s*-|empresa\s+plin/i.test(body);
+  if (isPlin) return TEMPLATES.plin(body, subject, date, messageId, bank);
+
+  return bank === 'interbank'
+    ? TEMPLATES.interbank(body, subject, date, messageId)
+    : TEMPLATES.bcp(body, subject, date, messageId);
 }
 
 // ===================== HELPERS DE PARSEO =====================
@@ -162,23 +173,25 @@ function fallbackNeedsReview(msg) {
  *   status:    confirmed | declined | reversed | refunded  (idem, se infiere)
  *   external_ref: nro. de operación/voucher si existe; si no, 'gmail:'+messageId
  * ===================================================================== */
+// Monto: maneja "S/ 10.00" y "S/. 3.90" (Interbank usa "S/.").
+var AMOUNT_RE = [/US\$\.?\s*([\d.,]+)/i, /S\/\.?\s*([\d.,]+)/i];
+// Tarjeta enmascarada: 4 dígitos tras los asteriscos ("****9251", "************2730").
+var CARD_RE = [/\*{2,}\s*(\d{4})/];
+// Voucher: SOLO "Número de operación NNN" (evita confundir con los 4 díg. de tarjeta).
+var VOUCHER_RE = [/n[uú]mero\s+de\s+operaci[oó]n\D*?(\d{4,})/i];
+
 var TEMPLATES = {
 
   // -------------------- YAPE --------------------
+  // (Aún sin muestra real: ajustar cuando llegue un correo de Yape.)
   // Correo solo para yapeos > S/10. Llega cuando pagas Y cuando te yapean.
   yape: function (body, subject, date, messageId) {
-    var amountM = firstMatch(body, [
-      /S\/\s*([\d.,]+)/i,
-      /por\s+S\/\s*([\d.,]+)/i,
-    ]);
-    // Contraparte: "a Juan Perez" / "de Maria Lopez"
+    var amountM = firstMatch(body, AMOUNT_RE);
     var who = firstMatch(body, [
       /(?:a|para)\s+([A-ZÁÉÍÓÚÑ][\w .'-]{2,40})/,
       /(?:de|recibiste de)\s+([A-ZÁÉÍÓÚÑ][\w .'-]{2,40})/,
     ]);
-    var voucher = firstMatch(body, [/(?:operaci[oó]n|n[uú]mero)\D*(\d{6,})/i]);
-    var text = subject + ' ' + body;
-
+    var voucher = firstMatch(body, VOUCHER_RE);
     return {
       source: 'email_yape',
       channel: 'yape',
@@ -189,22 +202,22 @@ var TEMPLATES = {
       amount: amountM ? parseAmount(amountM[1]) : 0,
       currency: 'PEN',
       external_ref: voucher ? 'yape:' + voucher[1] : 'gmail:' + messageId,
-      text: text,
+      text: subject + ' ' + body,
     };
   },
 
-  // -------------------- PLIN (vía alerta del banco) --------------------
-  plin: function (body, subject, date, messageId, from) {
-    var amountM = firstMatch(body, [/S\/\s*([\d.,]+)/i, /US\$\s*([\d.,]+)/i]);
+  // -------------------- PLIN (vía alerta del banco BCP/Interbank) --------------------
+  // Muestra real BCP: "...con tu Tarjeta de Débito BCP en PLIN-Alessandra Sanche",
+  // "Empresa  PLIN-Alessandra Sanche", "Número de operación  741981".
+  plin: function (body, subject, date, messageId, bank) {
+    var amountM = firstMatch(body, AMOUNT_RE);
     var who = firstMatch(body, [
-      /(?:a|para|de)\s+([A-ZÁÉÍÓÚÑ][\w .'-]{2,40})/,
+      /Empresa\s+([^\n\r]+)/i,
+      /\ben\s+(PLIN[-\s][^\n\r.]+)/i,
     ]);
-    var voucher = firstMatch(body, [/(?:operaci[oó]n|referencia)\D*(\d{6,})/i]);
-    var text = subject + ' ' + body;
-    var src = (from && from.indexOf('bcp') !== -1) ? 'email_bcp' : 'email_interbank';
-
+    var voucher = firstMatch(body, VOUCHER_RE);
     return {
-      source: src,
+      source: bank === 'interbank' ? 'email_interbank' : 'email_bcp',
       channel: 'plin',
       occurred_at: toIsoLima(date),
       merchant: who ? who[1].trim() : 'Plin',
@@ -212,21 +225,20 @@ var TEMPLATES = {
       amount: amountM ? parseAmount(amountM[1]) : 0,
       currency: detectCurrency(body),
       external_ref: voucher ? 'plin:' + voucher[1] : 'gmail:' + messageId,
-      text: text,
+      text: subject + ' ' + body,
     };
   },
 
   // -------------------- INTERBANK (tarjeta / consumo) --------------------
+  // Muestra real: "Comercio: OXXO TAMAYO", "Monto: S/. 3.90", "Tarjeta: ****9251".
   interbank: function (body, subject, date, messageId) {
-    var amountM = firstMatch(body, [/S\/\s*([\d.,]+)/i, /US\$\s*([\d.,]+)/i]);
-    // Comercio: suele venir como "en COMERCIO" / "Establecimiento: COMERCIO"
+    var amountM = firstMatch(body, AMOUNT_RE);
     var merch = firstMatch(body, [
-      /(?:en|Establecimiento:?)\s+([A-Z0-9][\w &.'*\/-]{2,40})/,
+      /Comercio:\s*([^\n\r]+)/i,
+      /\ben\s+([A-Z0-9][\w &.'*\/-]{2,40})/,
     ]);
-    var card = firstMatch(body, [/(?:tarjeta|terminada en)\D*(\d{4})\b/i]);
-    var voucher = firstMatch(body, [/(?:operaci[oó]n|referencia)\D*(\d{6,})/i]);
-    var text = subject + ' ' + body;
-
+    var card = firstMatch(body, CARD_RE);
+    var voucher = firstMatch(body, VOUCHER_RE);
     return {
       source: 'email_interbank',
       channel: 'tarjeta',
@@ -236,20 +248,21 @@ var TEMPLATES = {
       currency: detectCurrency(body),
       card_label: card ? 'Interbank ****' + card[1] : 'Interbank',
       external_ref: voucher ? 'ibk:' + voucher[1] : 'gmail:' + messageId,
-      text: text,
+      text: subject + ' ' + body,
     };
   },
 
-  // -------------------- BCP (tarjeta / consumo) --------------------
+  // -------------------- BCP (tarjeta / consumo, no Plin) --------------------
+  // Muestra real: "Realizaste un consumo de S/ 10.00 con tu Tarjeta de Débito BCP en <COMERCIO>".
   bcp: function (body, subject, date, messageId) {
-    var amountM = firstMatch(body, [/S\/\s*([\d.,]+)/i, /US\$\s*([\d.,]+)/i]);
+    var amountM = firstMatch(body, AMOUNT_RE);
     var merch = firstMatch(body, [
-      /(?:en|Comercio:?|Establecimiento:?)\s+([A-Z0-9][\w &.'*\/-]{2,40})/,
+      /Tarjeta de D[eé]bito BCP en\s+([^\n\r.]+)/i,
+      /Comercio:?\s*([^\n\r]+)/i,
+      /\ben\s+([A-Z0-9][\w &.'*\/-]{2,40})/,
     ]);
-    var card = firstMatch(body, [/(?:tarjeta|terminada en)\D*(\d{4})\b/i]);
-    var voucher = firstMatch(body, [/(?:operaci[oó]n|referencia)\D*(\d{6,})/i]);
-    var text = subject + ' ' + body;
-
+    var card = firstMatch(body, CARD_RE);
+    var voucher = firstMatch(body, VOUCHER_RE);
     return {
       source: 'email_bcp',
       channel: 'tarjeta',
@@ -259,7 +272,7 @@ var TEMPLATES = {
       currency: detectCurrency(body),
       card_label: card ? 'BCP ****' + card[1] : 'BCP',
       external_ref: voucher ? 'bcp:' + voucher[1] : 'gmail:' + messageId,
-      text: text,
+      text: subject + ' ' + body,
     };
   },
 };

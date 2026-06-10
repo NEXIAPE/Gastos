@@ -128,6 +128,14 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px
 .tab.active { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(16,24,40,.08); }
 .month-nav .field, .page-head .field { margin-bottom: 0; }
 
+/* ---- Recomendaciones (tips) ---- */
+.tips { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 760px) { .tips { grid-template-columns: 1fr; } }
+.tip { margin-bottom: 0; border-left: 4px solid var(--brand); }
+.tip-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tip-icon { font-size: 18px; }
+.tip-body { font-size: 13px; color: #374151; line-height: 1.5; }
+
 /* Tablas con scroll horizontal en pantallas chicas */
 .table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-scroll table { min-width: 560px; }

@@ -121,3 +121,9 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px
 
 /* Refinamiento general de tarjetas */
 .card { box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+
+/* ---- Pestañas ---- */
+.tabs { display: flex; gap: 4px; background: #eef0f3; padding: 4px; border-radius: 10px; width: fit-content; margin-bottom: 16px; }
+.tab { border: none; background: none; padding: 7px 16px; border-radius: 8px; font-size: 14px; color: var(--muted); }
+.tab.active { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(16,24,40,.08); }
+.month-nav .field, .page-head .field { margin-bottom: 0; }

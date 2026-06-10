@@ -27,8 +27,8 @@ export function Bars({ data, color = "#2563eb", horizontal = false }:
     return (
       <ResponsiveContainer width="100%" height={Math.max(220, data.length * 34)}>
         <BarChart data={data} layout="vertical" margin={{ left: 20, right: 20 }}>
-          <XAxis type="number" tickFormatter={(v) => `S/${v}`} />
-          <YAxis type="category" dataKey="key" width={140} />
+          <XAxis type="number" tickFormatter={(v) => `S/${v}`} tick={{ fill: "#94a3b8", fontSize: 12 }} />
+          <YAxis type="category" dataKey="key" width={140} tick={{ fill: "#94a3b8", fontSize: 12 }} />
           <Tooltip formatter={(v: number) => soles(v)} />
           <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
         </BarChart>
@@ -38,8 +38,8 @@ export function Bars({ data, color = "#2563eb", horizontal = false }:
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data} margin={{ left: 10, right: 10 }}>
-        <XAxis dataKey="key" />
-        <YAxis tickFormatter={(v) => `S/${v}`} />
+        <XAxis dataKey="key" tick={{ fill: "#94a3b8", fontSize: 12 }} />
+        <YAxis tickFormatter={(v) => `S/${v}`} tick={{ fill: "#94a3b8", fontSize: 12 }} />
         <Tooltip formatter={(v: number) => soles(v)} />
         <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
       </BarChart>

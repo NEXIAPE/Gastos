@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { CategoryRule, Insight, Transaction } from "./types";
+import type { Budget, CategoryRule, Insight, Transaction } from "./types";
 
 const TXN_COLS =
   "id, occurred_at, merchant_raw, merchant_clean, amount, direction, status, refund_of, " +
@@ -126,6 +126,22 @@ export async function getFxRate(): Promise<number> {
 export async function setFxRate(rate: number): Promise<void> {
   const { error } = await supabase.from("settings")
     .upsert({ key: "fx_usd_pen", value: rate, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
+// ---- Presupuestos (fase 2) ----
+export async function fetchBudgets(): Promise<Budget[]> {
+  const { data, error } = await supabase.from("budgets").select("*");
+  if (error) throw error;
+  return (data ?? []) as unknown as Budget[];
+}
+export async function upsertBudget(category: string, amount_pen: number): Promise<void> {
+  const { error } = await supabase.from("budgets")
+    .upsert({ category, amount_pen, period: "monthly", active: true }, { onConflict: "category" });
+  if (error) throw error;
+}
+export async function deleteBudget(category: string): Promise<void> {
+  const { error } = await supabase.from("budgets").delete().eq("category", category);
   if (error) throw error;
 }
 

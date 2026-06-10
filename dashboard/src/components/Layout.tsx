@@ -6,6 +6,7 @@ const links: [string, string][] = [
   ["/", "Resumen"],
   ["/analisis", "Análisis"],
   ["/transacciones", "Transacciones"],
+  ["/presupuestos", "Presupuestos"],
   ["/insights", "Recomendaciones"],
   ["/ajustes", "Ajustes"],
 ];
@@ -14,7 +15,7 @@ export default function Layout() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <h1>Gastos</h1>
+        <h1>💸 Gastos</h1>
         <nav className="nav">
           {links.map(([to, label]) => (
             <NavLink key={to} to={to} end={to === "/"}>{label}</NavLink>

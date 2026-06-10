@@ -1,0 +1,13 @@
+# Configuración del proyecto Supabase (CLI).
+# Reemplaza project_id por el ref de tu proyecto al hacer `supabase link`.
+project_id = "gastos"
+
+[functions.ingest]
+# El Atajo de iOS y el Apps Script usan un token propio (INGEST_TOKEN),
+# no un JWT de Supabase: desactivamos la verificación de JWT.
+verify_jwt = false
+
+[functions.weekly-insights]
+# Se invoca con el JWT del usuario logueado (dashboard) o con el service_role
+# key (cron). Ambos son JWT válidos.
+verify_jwt = true

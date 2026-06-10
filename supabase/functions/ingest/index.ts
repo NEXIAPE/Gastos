@@ -56,6 +56,16 @@ async function getFxRate(): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : 3.75;
 }
 
+// Nombres/alias propios del usuario. Si la contraparte coincide, el movimiento
+// es una transferencia a sí mismo (no es gasto). Editable desde la tabla
+// `settings` (clave 'self_names', un array JSON) sin redeploy.
+const SELF_NAMES_DEFAULT = ["ALESSANDRA SANCHE", "ALESSANDRA SANCHEZ", "ALES SANCHEZ"];
+async function getSelfNames(): Promise<string[]> {
+  const { data } = await admin.from("settings").select("value").eq("key", "self_names").maybeSingle();
+  const extra = Array.isArray(data?.value) ? (data!.value as unknown[]).map((x) => String(x)) : [];
+  return [...new Set([...SELF_NAMES_DEFAULT, ...extra].map((s) => s.toUpperCase().trim()))].filter(Boolean);
+}
+
 async function getRules(): Promise<CategoryRule[]> {
   const { data } = await admin.from("category_rules").select("match_text, category, priority");
   return (data ?? []) as CategoryRule[];
@@ -98,6 +108,15 @@ Deno.serve(async (req) => {
   // Estado: el explícito manda; si no, se infiere del texto.
   let status: Status = body.status ?? detectStatus(inferText);
   if (directionWasUncertain && status === "confirmed") status = "needs_review";
+
+  // Transferencia a sí mismo: si la contraparte/comercio es el propio usuario
+  // (ej. yapearse a tu propio Plin), NO es gasto → direction 'transfer'.
+  const whoText = `${body.counterparty ?? ""} ${merchant_clean}`.toUpperCase();
+  const selfNames = await getSelfNames();
+  if (selfNames.some((n) => whoText.includes(n))) {
+    direction = "transfer";
+    if (status === "needs_review") status = "confirmed"; // ya sabemos qué es
+  }
 
   // Monto en soles (tipo de cambio fijo configurable).
   let fx_rate: number | null = null;

@@ -1,4 +1,5 @@
 import type { Transaction } from "./types";
+import { type ExpenseGroup, groupOf } from "./types";
 
 export const sumPen = (rows: { amount_pen: number | null }[]): number =>
   Number(rows.reduce((a, r) => a + (r.amount_pen ?? 0), 0).toFixed(2));
@@ -28,3 +29,12 @@ export function limaMonthKey(iso: string): string {
 export const byCategory = (rows: Transaction[]) => groupByPen(rows, (r) => r.category);
 export const byChannel = (rows: Transaction[]) => groupByPen(rows, (r) => r.channel);
 export const byMerchant = (rows: Transaction[]) => groupByPen(rows, (r) => r.merchant_clean);
+export const byGroup = (rows: Transaction[]) => groupByPen(rows, (r) => groupOf(r.category));
+
+/** Suma del gasto de las categorías que pertenecen a un Tipo de Gasto. */
+export const sumByGroup = (rows: Transaction[], group: ExpenseGroup): number =>
+  sumPen(rows.filter((r) => groupOf(r.category) === group));
+
+/** Suma del gasto de una categoría puntual (ej. Luna). */
+export const sumByCategory = (rows: Transaction[], category: string): number =>
+  sumPen(rows.filter((r) => r.category === category));

@@ -103,6 +103,12 @@ function parseMessage(msg) {
            : ((hay.indexOf('bcp') !== -1 || hay.indexOf('viabcp') !== -1) ? 'bcp' : null);
   if (!bank) return null; // desconocido → irá a "Por revisar"
 
+  // Pago Automático de servicios (Luz del Sur, etc.) — viene de
+  // pagoautomatico@notificaciones.interbank.pe y trae "Empresa: 006 - LUZ DEL SUR".
+  if (bank === 'interbank' && (hay.indexOf('pago autom') !== -1 || from.indexOf('pagoautomatico') !== -1)) {
+    return TEMPLATES.pagoAutomatico(body, subject, date, messageId);
+  }
+
   // ¿Es un Plin? Marcador fuerte en el CUERPO ("PLIN-Nombre" / "Empresa PLIN").
   // OJO: no usamos "plin" suelto porque los correos de Interbank mencionan
   // "plin.pe" en el pie de página de seguridad (falso positivo).
@@ -239,6 +245,30 @@ var TEMPLATES = {
       amount: amountM ? parseAmount(amountM[1]) : 0,
       currency: detectCurrency(body),
       external_ref: voucher ? 'plin:' + voucher[1] : 'gmail:' + messageId,
+      text: subject + ' ' + body,
+    };
+  },
+
+  // -------------------- INTERBANK · PAGO AUTOMÁTICO de servicios --------------------
+  // Muestra real: "Empresa: 006 - LUZ DEL SUR", "Monto cobrado: S/ 146.40".
+  // El "Código cliente" NO es único por mes → external_ref = id del correo.
+  pagoAutomatico: function (body, subject, date, messageId) {
+    var amountM = firstMatch(body, [/Monto\s+cobrado:?\s*S\/\.?\s*([\d.,]+)/i]) || firstMatch(body, AMOUNT_RE);
+    var merch = firstMatch(body, [
+      /Empresa:?\s*\d*\s*-\s*([^\n\r]+)/i,
+      /Servicio:?\s*\d*\s*-\s*([^\n\r]+)/i,
+    ]);
+    return {
+      source: 'email_interbank',
+      channel: 'tarjeta',
+      direction: 'out',
+      status: statusFromSubject(subject),
+      occurred_at: toIsoLima(date),
+      merchant: merch ? merch[1].trim() : 'Pago automático Interbank',
+      amount: amountM ? parseAmount(amountM[1]) : 0,
+      currency: detectCurrency(body),
+      external_ref: 'gmail:' + messageId,
+      notes: 'Pago automático',
       text: subject + ' ' + body,
     };
   },

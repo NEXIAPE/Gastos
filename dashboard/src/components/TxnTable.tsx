@@ -21,7 +21,7 @@ export default function TxnTable({ rows, onChange }: { rows: Transaction[]; onCh
   return (
     <>
       <div className="table-scroll">
-      <table>
+      <table className="txntable">
         <thead>
           <tr>
             <th>Fecha</th><th>Comercio</th><th>Categoría</th><th>Canal</th>
@@ -31,19 +31,19 @@ export default function TxnTable({ rows, onChange }: { rows: Transaction[]; onCh
         <tbody>
           {rows.map((t) => (
             <tr key={t.id}>
-              <td>{fmtDateTime(t.occurred_at)}</td>
-              <td>
+              <td className="c-date">{fmtDateTime(t.occurred_at)}</td>
+              <td className="c-merchant">
                 {t.merchant_clean || t.merchant_raw || "—"}
                 {t.is_recurring && <span className="badge" style={{ marginLeft: 6 }}>recurrente</span>}
               </td>
-              <td>{t.category}</td>
-              <td>{t.channel ? CHANNEL_LABEL[t.channel] : "—"}</td>
-              <td className="num">
+              <td className="c-cat">{t.category}</td>
+              <td className="c-chan">{t.channel ? CHANNEL_LABEL[t.channel] : "—"}</td>
+              <td className="num c-amount">
                 {soles(t.amount_pen)}
                 {t.currency === "USD" && <div className="stat-sub">US$ {t.amount.toFixed(2)}</div>}
               </td>
-              <td><StatusBadge t={t} /></td>
-              <td><button className="link" onClick={() => setEditing(t)}>editar</button></td>
+              <td className="c-status"><StatusBadge t={t} /></td>
+              <td className="c-edit"><button className="link" onClick={() => setEditing(t)}>editar</button></td>
             </tr>
           ))}
         </tbody>

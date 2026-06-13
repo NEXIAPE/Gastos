@@ -199,19 +199,24 @@ var VOUCHER_RE = [/n[uú]mero\s+de\s+operaci[oó]n\D*?(\d{4,})/i];
 var TEMPLATES = {
 
   // -------------------- YAPE --------------------
-  // (Aún sin muestra real: ajustar cuando llegue un correo de Yape.)
-  // Correo solo para yapeos > S/10. Llega cuando pagas Y cuando te yapean.
+  // Muestra real (vía BCP, captura desde S/1): "Constancia de Yapeo a Celular",
+  // "Realizaste un yapeo a celular de S/ 1.00", "Monto enviado S/ 1.00",
+  // "Enviado a Emilio Renato Flores M.". También cubre yapeos recibidos.
   yape: function (body, subject, date, messageId) {
-    var amountM = firstMatch(body, AMOUNT_RE);
+    var t = (subject + ' ' + body).toLowerCase();
+    var direction = /recib|te yape|abono|ingreso a tu cuenta|te deposit/.test(t) ? 'in'
+                  : /realizaste|yapeaste|enviaste|monto enviado|yapeo a|pagaste/.test(t) ? 'out'
+                  : null; // si no se sabe, el endpoint lo infiere
+    var amountM = firstMatch(body, [/Monto\s+(?:enviado|recibido):?\s*S\/\.?\s*([\d.,]+)/i]) || firstMatch(body, AMOUNT_RE);
     var who = firstMatch(body, [
+      /Enviado a\s+([A-ZÁÉÍÓÚÑ][^\n\r]{2,50})/i,
+      /Recibido de\s+([A-ZÁÉÍÓÚÑ][^\n\r]{2,50})/i,
       /(?:a|para)\s+([A-ZÁÉÍÓÚÑ][\w .'-]{2,40})/,
-      /(?:de|recibiste de)\s+([A-ZÁÉÍÓÚÑ][\w .'-]{2,40})/,
     ]);
     var voucher = firstMatch(body, VOUCHER_RE);
-    return {
+    var ret = {
       source: 'email_yape',
       channel: 'yape',
-      // direction la infiere el endpoint del `text` (pagaste/te yapearon/etc.).
       status: statusFromSubject(subject),
       occurred_at: toIsoLima(date),
       merchant: who ? who[1].trim() : 'Yape',
@@ -221,6 +226,8 @@ var TEMPLATES = {
       external_ref: voucher ? 'yape:' + voucher[1] : 'gmail:' + messageId,
       text: subject + ' ' + body,
     };
+    if (direction) ret.direction = direction; // el endpoint puede reclasificar a 'transfer' si eres tú
+    return ret;
   },
 
   // -------------------- PLIN (vía alerta del banco BCP/Interbank) --------------------

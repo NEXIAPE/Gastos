@@ -204,9 +204,11 @@ var TEMPLATES = {
   // "Enviado a Emilio Renato Flores M.". También cubre yapeos recibidos.
   yape: function (body, subject, date, messageId) {
     var t = (subject + ' ' + body).toLowerCase();
-    var direction = /recib|te yape|abono|ingreso a tu cuenta|te deposit/.test(t) ? 'in'
-                  : /realizaste|yapeaste|enviaste|monto enviado|yapeo a|pagaste/.test(t) ? 'out'
-                  : null; // si no se sabe, el endpoint lo infiere
+    // OUT manda (el pie de página dice "recibir"/"RECIBIR", así que NO usamos
+    // "recib" suelto para 'in'; solo frases específicas de recepción).
+    var isOut = /realizaste|monto enviado|enviaste|yapeaste|yapear a celular|pagaste/.test(t);
+    var isIn = /te yapearon|recibiste un yape|monto recibido|yapeo recibido|abono a tu cuenta|ingreso a tu cuenta|te deposit/.test(t);
+    var direction = isOut ? 'out' : (isIn ? 'in' : null);
     var amountM = firstMatch(body, [/Monto\s+(?:enviado|recibido):?\s*S\/\.?\s*([\d.,]+)/i]) || firstMatch(body, AMOUNT_RE);
     var who = firstMatch(body, [
       /Enviado a\s+([A-ZÁÉÍÓÚÑ][^\n\r]{2,50})/i,

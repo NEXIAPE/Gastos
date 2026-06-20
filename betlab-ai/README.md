@@ -33,6 +33,11 @@ reportes diarios.
                         MODULE 5 · Value Bet Engine
                         EV = (P_modelo × cuota) − 1   →  EV > 5%
                                      ▼
+                  SCORE DE CONFIANZA (0-100) · 10 factores
+            xG · Elo · Forma5 · Forma10 · Lesiones · Fatiga ·
+            Rend.Local · Rend.Visitante · H2H · Mov.Cuotas
+            → Elite(90+) / Strong(80+) / Lean(70+) / No Bet ; filtro > 80
+                                     ▼
                         MODULE 6 · Kelly Criterion (25%)
                         stake sugerido · riesgo · % bankroll
                                      ▼
@@ -73,7 +78,9 @@ betlab-ai/
 ├── models/                    # MODULES 3-6 (analítica)
 │   ├── team_strength.py       #   MODULE 3 - ratings dinámicos
 │   ├── poisson_model.py       #   MODULE 4 - distribución de Poisson
-│   ├── value_bet.py           #   MODULE 5 - Value Bet Engine (EV)
+│   ├── elo.py                 #   Elo Rating dinámico
+│   ├── confidence.py          #   Score de Confianza (10 factores) + tier
+│   ├── value_bet.py           #   MODULE 5 - Value Bet Engine (EV + confianza)
 │   ├── kelly.py               #   MODULE 6 - Kelly fraccionado
 │   ├── roi.py                 #   Registro de resultados + ROI
 │   └── __init__.py
@@ -116,7 +123,9 @@ Inicializar: `python main.py initdb`.
 | **2 · Odds Scraper** | `services/odds_api.py` | 1X2, Over/Under, BTTS, Asian Handicap → histórico de cuotas. |
 | **3 · Team Strength** | `models/team_strength.py` | Ataque, defensa, ventaja local, rendimiento visitante, forma → rating dinámico. |
 | **4 · Poisson Model** | `models/poisson_model.py` | Goles esperados local/visitante; P(resultado), P(Over 2.5), P(BTTS), P(victoria). |
-| **5 · Value Bet Engine** | `models/value_bet.py` | `EV = (P_modelo × cuota) − 1`; muestra solo `EV > 5%`. |
+| **Elo Rating** | `models/elo.py` | Rating Elo dinámico con ventaja de localía y margen de goles. |
+| **Score de Confianza** | `models/confidence.py` | Combina 10 factores en un score 0-100 + tier (Elite/Strong/Lean/No Bet). |
+| **5 · Value Bet Engine** | `models/value_bet.py` | `EV = (P_modelo × cuota) − 1`; muestra solo `EV > 5%` **y** confianza `> 80`. |
 | **6 · Kelly Criterion** | `models/kelly.py` | Kelly fraccionado al 25%: stake sugerido, riesgo, % bankroll. |
 | **7 · Dashboard** | `dashboard/app.py` | Streamlit: Top Picks, EV%, ROI acumulado, historial, gráficos. |
 | **8 · Report Generator** | `reports/report_generator.py` | `reporte_diario.html` con el TOP 10 (partido, mercado, cuota, prob, EV, stake). |
@@ -170,7 +179,8 @@ Todos los parámetros viven en `.env` (ver `.env.example`):
 |----------|-------------|-------------|
 | `API_FOOTBALL_KEY` | — | Clave de API-Football. |
 | `ODDS_API_KEY` | — | Clave de The Odds API. |
-| `MIN_EV` | `0.05` | EV mínimo para mostrar una apuesta (5%). |
+| `MIN_EV` | `0.05` | EV mínimo para considerar valor (5%). |
+| `MIN_CONFIDENCE` | `80` | Score de Confianza mínimo (solo Strong/Elite). |
 | `KELLY_FRACTION` | `0.25` | Fracción de Kelly aplicada. |
 | `BANKROLL` | `1000` | Bankroll inicial (€). |
 | `MAX_STAKE_PCT` | `0.10` | Tope de stake por apuesta. |
@@ -178,7 +188,42 @@ Todos los parámetros viven en `.env` (ver `.env.example`):
 
 ---
 
-## 8. Metodología (probabilidad, no intuición)
+## 8. Score Final de Confianza (10 factores)
+
+Sobre cada candidata a value bet (EV > 5%) se calcula un **Score de Confianza
+de 0 a 100** (`models/confidence.py` + `models/elo.py`). Cada factor se orienta
+a la selección concreta y devuelve un valor 0-100 (>50 = apoya la apuesta); el
+score es su media ponderada, renormalizada según los factores aplicables al
+mercado.
+
+| # | Factor | Peso | Qué mide |
+|---|--------|------|----------|
+| 1 | **Expected Goals (xG)** | 14 | Calidad de creación/concesión (xG a favor − en contra). |
+| 2 | **Elo Rating** | 16 | Fuerza global dinámica (con ventaja de localía y margen de goles). |
+| 3 | **Forma últimos 5** | 10 | Puntos por partido recientes (corto plazo). |
+| 4 | **Forma últimos 10** | 8 | Puntos por partido (medio plazo). |
+| 5 | **Lesiones ponderadas** | 8 | Bajas del equipo vs. del rival. |
+| 6 | **Fatiga por calendario** | 6 | Días de descanso desde el último partido. |
+| 7 | **Rendimiento local** | 10 | Puntos del local jugando en casa. |
+| 8 | **Rendimiento visitante** | 10 | Puntos del visitante jugando fuera. |
+| 9 | **Historial H2H** | 8 | Resultados directos previos (y % Over / BTTS). |
+| 10 | **Movimiento de cuotas** | 10 | Si la cuota se ha acortado desde la apertura (entrada de dinero). |
+
+**Clasificación del score:**
+
+| Score | Tier | Acción |
+|-------|------|--------|
+| 90-100 | 🟡 **Elite Pick** | Máxima confianza |
+| 80-89 | 🔵 **Strong Pick** | Alta confianza |
+| 70-79 | ⚪ Lean | Confianza moderada |
+| < 70 | ⚫ No Bet | Descartar |
+
+> **Solo se muestran apuestas con Score > 80** (Strong y Elite). Configurable
+> con `MIN_CONFIDENCE`.
+
+---
+
+## 9. Metodología (probabilidad, no intuición)
 
 1. **Ratings** — ataque y defensa relativos a la media de la liga, mezclando
    goles reales con xG para reducir ruido; se ajustan por ventaja de localía,

@@ -54,11 +54,12 @@ def cmd_value(_args) -> None:
     from models.value_bet import detect_value_bets
 
     bets = detect_value_bets()
-    print(f"✔ {len(bets)} value bets detectadas (EV > {settings.min_ev:.0%}).")
+    print(f"✔ {len(bets)} picks (EV > {settings.min_ev:.0%} y confianza > "
+          f"{settings.min_confidence:.0f}).")
     for b in bets[:10]:
-        print(f"  · {b.match:<32} {b.market:<7} {b.selection:<5} "
-              f"cuota={b.odd:<5} prob={b.model_prob:.0%} EV=+{b.ev:.1%} "
-              f"stake={b.stake_amount:.2f}€")
+        print(f"  · {b.match:<30} {b.market:<7} {b.selection:<5} "
+              f"cuota={b.odd:<5} EV=+{b.ev:.1%} conf={b.confidence:>4.0f} "
+              f"[{b.tier}] stake={b.stake_amount:.2f}€")
 
 
 def cmd_report(_args) -> None:
@@ -88,9 +89,10 @@ def cmd_pipeline(args) -> None:
     summary = ingest(target_date=args.date)
     print(f"   {summary}")
 
-    print("→ 2/4 Detección de value bets (ratings + Poisson + EV + Kelly)...")
+    print("→ 2/4 Detección de picks (Poisson + EV + Score de Confianza + Kelly)...")
     bets = detect_value_bets()
-    print(f"   {len(bets)} value bets con EV > {settings.min_ev:.0%}.")
+    print(f"   {len(bets)} picks con EV > {settings.min_ev:.0%} y confianza > "
+          f"{settings.min_confidence:.0f}.")
 
     print("→ 3/4 Registro de picks en el historial...")
     logged = log_value_bets()

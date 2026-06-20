@@ -37,6 +37,11 @@ def _label_selection(s: str) -> str:
     return SELECTION_LABELS.get(s, s)
 
 
+def _tier_class(tier: str) -> str:
+    return {"Elite Pick": "elite", "Strong Pick": "strong",
+            "Lean": "lean"}.get(tier, "nobet")
+
+
 def generate_report(bets: list[ValueBet], top_n: int = 10,
                     output_path: Path | str | None = None) -> Path:
     """Crea el HTML del reporte diario y devuelve su ruta."""
@@ -54,10 +59,12 @@ def generate_report(bets: list[ValueBet], top_n: int = 10,
             <td class="num">{b.odd:.2f}</td>
             <td class="num">{b.model_prob * 100:.1f}%</td>
             <td class="num ev">+{b.ev * 100:.1f}%</td>
+            <td class="num conf">{b.confidence:.0f}</td>
+            <td><span class="tier {_tier_class(b.tier)}">{b.tier}</span></td>
             <td class="num">{b.stake_pct * 100:.2f}% · {b.stake_amount:.2f}€</td>
         </tr>"""
         for i, b in enumerate(top, start=1)
-    ) or '<tr><td colspan="7" class="empty">No se detectaron value bets con EV suficiente hoy.</td></tr>'
+    ) or '<tr><td colspan="9" class="empty">No se detectaron picks con confianza &gt; 80 hoy.</td></tr>'
 
     html = f"""<!DOCTYPE html>
 <html lang="es">
@@ -90,6 +97,13 @@ def generate_report(bets: list[ValueBet], top_n: int = 10,
   td.rank {{ color:var(--accent2); font-weight:700; width:40px; }}
   td.match {{ font-weight:600; }}
   td.ev {{ color:var(--accent); font-weight:700; }}
+  td.conf {{ font-weight:700; }}
+  .tier {{ padding:3px 10px; border-radius:12px; font-size:12px; font-weight:700;
+           white-space:nowrap; }}
+  .tier.elite  {{ background:#bb8009; color:#fff; }}
+  .tier.strong {{ background:#1f6feb; color:#fff; }}
+  .tier.lean   {{ background:#3a3f48; color:#cbd2d9; }}
+  .tier.nobet  {{ background:#444; color:#aaa; }}
   td.empty {{ text-align:center; color:var(--muted); padding:32px; }}
   tr:last-child td {{ border-bottom:none; }}
   footer {{ color:var(--muted); font-size:12px; margin-top:20px; text-align:center; }}
@@ -114,7 +128,7 @@ def generate_report(bets: list[ValueBet], top_n: int = 10,
       <thead>
         <tr>
           <th>#</th><th>Partido</th><th>Mercado</th><th>Cuota</th>
-          <th>Probabilidad</th><th>EV</th><th>Stake</th>
+          <th>Probabilidad</th><th>EV</th><th>Confianza</th><th>Tier</th><th>Stake</th>
         </tr>
       </thead>
       <tbody>{rows_html}
@@ -122,7 +136,8 @@ def generate_report(bets: list[ValueBet], top_n: int = 10,
     </table>
 
     <footer>
-      Generado por BETLAB AI · Modelo de Poisson + Expected Value + Kelly fraccionado.<br>
+      Generado por BETLAB AI · Poisson + Expected Value + Score de Confianza (10 factores) + Kelly fraccionado.<br>
+      Solo se muestran picks con Score de Confianza &gt; 80 (Strong / Elite).<br>
       Las apuestas conllevan riesgo. Este reporte es una herramienta de análisis estadístico, no una garantía.
     </footer>
   </div>

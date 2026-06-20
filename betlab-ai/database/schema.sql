@@ -108,6 +108,9 @@ CREATE TABLE IF NOT EXISTS value_bets (
     odd             REAL NOT NULL,               -- mejor cuota de mercado
     implied_prob    REAL NOT NULL,               -- prob. implícita de la cuota
     ev              REAL NOT NULL,               -- expected value
+    confidence      REAL,                        -- Score de Confianza 0-100
+    tier            TEXT,                        -- Elite/Strong/Lean/No Bet
+    factors_json    TEXT,                        -- desglose de los 10 factores
     stake_pct       REAL,                        -- % bankroll (Kelly frac.)
     stake_amount    REAL,                        -- stake monetario
     created_at      TEXT DEFAULT (datetime('now')),

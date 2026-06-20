@@ -51,9 +51,12 @@ class Settings:
     )
     odds_api_key: str = field(default_factory=lambda: os.getenv("ODDS_API_KEY", ""))
 
-    # --- Parámetros del Value Bet Engine ------------------------------------
+    # --- Value Bet Engine ---------------------------------------------------
     # EV mínimo para considerar una apuesta de valor (5% -> 0.05).
     min_ev: float = field(default_factory=lambda: _get_float("MIN_EV", 0.05))
+    # Score de confianza mínimo (0-100) para mostrar una apuesta.
+    # 80 => solo Strong Picks (80-89) y Elite Picks (90-100).
+    min_confidence: float = field(default_factory=lambda: _get_float("MIN_CONFIDENCE", 80.0))
 
     # --- Kelly Criterion ----------------------------------------------------
     # Fracción de Kelly aplicada (25% -> 0.25).

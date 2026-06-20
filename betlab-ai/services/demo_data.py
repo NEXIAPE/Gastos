@@ -107,6 +107,7 @@ def seed_database(num_history_matches: int = 14) -> None:
                 "away_goals": None,
             })
             _seed_odds(conn, fixture_id, home_id, away_id, team_map, np_rng)
+            _seed_injuries(conn, fixture_id, home_id, away_id, np_rng)
 
 
 def _seed_stats(conn, fixture_id: int, team_id: int, is_home: bool,
@@ -129,7 +130,12 @@ def _seed_stats(conn, fixture_id: int, team_id: int, is_home: bool,
 
 def _seed_odds(conn, fixture_id: int, home_id: int, away_id: int,
                team_map: dict, np_rng) -> None:
-    """Crea cuotas de mercado con un margen de casa (~5%) y ruido por libro."""
+    """
+    Crea cuotas con margen de casa (~6%) y ruido por libro, en DOS snapshots:
+    una cuota de *apertura* (hace 2 días) y una *actual* (ahora). La actual se
+    mueve ligeramente respecto a la apertura, lo que alimenta el factor de
+    'movimiento de cuotas' del Score de Confianza.
+    """
     from models.poisson_model import PoissonModel  # import diferido
 
     h_att, h_def = team_map[home_id][2], team_map[home_id][3]
@@ -140,7 +146,6 @@ def _seed_odds(conn, fixture_id: int, home_id: int, away_id: int,
     model = PoissonModel(lam_home, lam_away)
     probs = model.summary()
 
-    # Probabilidades "verdaderas" -> cuotas justas + margen + ruido.
     def odd_from_prob(p: float, margin: float = 1.06) -> float:
         p = min(0.97, max(0.03, p))
         fair = 1.0 / p
@@ -156,12 +161,40 @@ def _seed_odds(conn, fixture_id: int, home_id: int, away_id: int,
         ("BTTS", "YES", probs["btts"]),
         ("BTTS", "NO", 1 - probs["btts"]),
     ]
+
+    opening_ts = (datetime(2026, 6, 20) - timedelta(days=2)).isoformat()
+    current_ts = datetime(2026, 6, 20, 12).isoformat()
+
     for bk in ("Pinnacle", "Bet365", "William Hill"):
         for market, selection, p in rows:
+            opening = odd_from_prob(p)
+            # Deriva la cuota actual: a veces se acorta (entra dinero), a veces se abre.
+            drift = float(np_rng.normal(0.0, 0.03))      # ±3% típico
+            current = round(max(1.01, opening * (1.0 + drift)), 2)
             conn.execute(
-                "INSERT INTO odds (fixture_id, bookmaker, market, selection, odd) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (fixture_id, bk, market, selection, odd_from_prob(p)),
+                "INSERT INTO odds (fixture_id, bookmaker, market, selection, odd, captured_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (fixture_id, bk, market, selection, opening, opening_ts),
+            )
+            conn.execute(
+                "INSERT INTO odds (fixture_id, bookmaker, market, selection, odd, captured_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (fixture_id, bk, market, selection, current, current_ts),
+            )
+
+
+# Catálogo demo de jugadores lesionados (nombre genérico por equipo).
+def _seed_injuries(conn, fixture_id: int, home_id: int, away_id: int, np_rng) -> None:
+    """Siembra 0-2 lesiones por equipo para alimentar el factor de lesiones."""
+    reasons = ["Lesión muscular", "Sobrecarga", "Sanción", "Esguince"]
+    for team_id in (home_id, away_id):
+        n = int(np_rng.integers(0, 3))   # 0, 1 o 2 lesiones
+        for i in range(n):
+            conn.execute(
+                "INSERT INTO injuries (fixture_id, team_id, player, reason) "
+                "VALUES (?, ?, ?, ?)",
+                (fixture_id, team_id, f"Jugador {team_id}-{i+1}",
+                 reasons[int(np_rng.integers(0, len(reasons)))]),
             )
 
 

@@ -6,7 +6,8 @@ A partir de los picks generados por el Value Bet Engine construye los
 productos de la estrategia diaria:
 
   * Ordena todas las apuestas por EV, Probabilidad y Confianza.
-  * Filtra el pool elegible:  EV > 5%  ·  Confianza > 80  ·  Cuota ∈ [1.40, 2.20].
+  * Filtra el pool elegible:  EV > 5%  ·  Confianza ≥ mínimo activo
+    (· rango de cuota [ODD_MIN, ODD_MAX] opcional, desactivado por defecto).
   * A) PICK PREMIUM DEL DÍA  — mejor combinación de EV y confianza.
   * B) TOP 5 VALUE BETS.
   * C) COMBINADA CONSERVADORA (máx. 2 selecciones).
@@ -153,8 +154,9 @@ def build_strategies(bets: list[ValueBet] | None = None,
     by_prob = sorted(bets, key=lambda b: b.model_prob, reverse=True)
     by_confidence = sorted(bets, key=lambda b: b.confidence, reverse=True)
 
-    # 2) Pool elegible: EV>5%, confianza por encima del mínimo activo y
-    #    cuota dentro de la banda [odd_min, odd_max].
+    # 2) Pool elegible: EV>5% y confianza por encima del mínimo activo.
+    #    El rango de cuota [odd_min, odd_max] está desactivado por defecto
+    #    (configurable con ODD_MIN/ODD_MAX en .env).
     min_conf = state.min_confidence
     pool = [
         b for b in bets

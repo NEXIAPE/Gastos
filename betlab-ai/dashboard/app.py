@@ -55,8 +55,10 @@ MODE_COLOR = {"NORMAL": "🟢", "REDUCED": "🟡", "CONSERVATION": "🔴"}
 
 @st.cache_data(show_spinner=False)
 def load_strategies():
-    rep = build_strategies()
-    return rep
+    # Refresca la clasificación de ligas para que la confianza incorpore el
+    # ajuste por liga, igual que en el pipeline.
+    analyze_leagues(initial_bankroll=settings.bankroll)
+    return build_strategies()
 
 
 def main() -> None:

@@ -50,9 +50,20 @@ def cmd_ingest(args) -> None:
         print(f"✔ Ingesta completada: {summary}")
 
 
+def _refresh_context() -> None:
+    """Refresca el League Analyzer y el Bankroll Manager antes de detectar picks,
+    de modo que los comandos sueltos sean coherentes con el pipeline."""
+    from models.bankroll import get_state
+    from models.league_analyzer import analyze
+
+    analyze(initial_bankroll=settings.bankroll)
+    get_state()
+
+
 def cmd_value(_args) -> None:
     from models.value_bet import detect_value_bets
 
+    _refresh_context()
     bets = detect_value_bets()
     print(f"✔ {len(bets)} picks (EV > {settings.min_ev:.0%} y confianza > "
           f"{settings.min_confidence:.0f}).")
@@ -65,6 +76,7 @@ def cmd_value(_args) -> None:
 def cmd_report(_args) -> None:
     from reports.report_generator import generate_report
 
+    _refresh_context()
     path = generate_report()
     print(f"✔ Reporte generado: {path}")
 
@@ -136,12 +148,14 @@ def cmd_backtest(_args) -> None:
 
 
 def cmd_strategies(_args) -> None:
-    _print_strategies()
+    _print_strategies(refresh=True)
 
 
-def _print_strategies() -> None:
+def _print_strategies(refresh: bool = False) -> None:
     from models.strategies import build_strategies
 
+    if refresh:
+        _refresh_context()
     rep = build_strategies()
     sl = {"HOME": "Local", "DRAW": "Empate", "AWAY": "Visitante", "OVER": "Over",
           "UNDER": "Under", "YES": "BTTS Sí", "NO": "BTTS No"}

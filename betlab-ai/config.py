@@ -60,8 +60,9 @@ class Settings:
     # Diferencia mínima |prob_modelo - prob_implícita| (No Bet si es menor).
     min_prob_edge: float = field(default_factory=lambda: _get_float("MIN_PROB_EDGE", 0.03))
     # Rango de cuota elegible para estrategias/combinadas.
-    odd_min: float = field(default_factory=lambda: _get_float("ODD_MIN", 1.40))
-    odd_max: float = field(default_factory=lambda: _get_float("ODD_MAX", 2.20))
+    # Por defecto sin restricción; fija ODD_MIN/ODD_MAX en .env para activarlo.
+    odd_min: float = field(default_factory=lambda: _get_float("ODD_MIN", 1.01))
+    odd_max: float = field(default_factory=lambda: _get_float("ODD_MAX", 1000.0))
 
     # --- No Bet Engine ------------------------------------------------------
     # Nº de bajas importantes a partir del cual se marca NO BET.

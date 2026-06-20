@@ -53,6 +53,17 @@ FACTOR_LABELS = {
 MODE_COLOR = {"NORMAL": "🟢", "REDUCED": "🟡", "CONSERVATION": "🔴"}
 
 
+def _ensure_data() -> None:
+    """En la primera carga (DB vacía) siembra datos demo automáticamente.
+    Permite abrir la app desplegada (p.ej. Streamlit Cloud) sin configurar nada."""
+    n = query_df("SELECT COUNT(*) AS c FROM fixtures")["c"].iloc[0]
+    if n == 0:
+        with st.spinner("Inicializando datos (primera carga, ~10 s)..."):
+            from services.data_ingestion import ingest
+            ingest()
+        load_strategies.clear()
+
+
 @st.cache_data(show_spinner=False)
 def load_strategies():
     # Refresca la clasificación de ligas para que la confianza incorpore el
@@ -63,6 +74,7 @@ def load_strategies():
 
 def main() -> None:
     init_db()
+    _ensure_data()
     st.title("⚽ BETLAB AI · Sistema de Value Betting")
     st.caption("Poisson · xG · Elo · Confianza · Performance · Ligas · No-Bet · Bankroll · Backtesting")
 

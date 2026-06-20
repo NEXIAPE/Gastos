@@ -43,16 +43,17 @@ from models.elo import BASE_ELO, compute_elo
 
 # --- Pesos base de cada factor (suman 100) ---------------------------------
 FACTOR_WEIGHTS = {
+    "poisson": 16.0,        # convicción del modelo de Poisson (edge vs mercado)
     "xg": 14.0,
-    "elo": 16.0,
-    "form5": 10.0,
-    "form10": 8.0,
+    "elo": 14.0,
+    "form5": 8.0,           # forma reciente (corto plazo)
+    "form10": 6.0,          # forma reciente (medio plazo)
     "injuries": 8.0,
     "fatigue": 6.0,
-    "home_perf": 10.0,
-    "away_perf": 10.0,
-    "h2h": 8.0,
-    "odds_movement": 10.0,
+    "home_perf": 8.0,
+    "away_perf": 8.0,
+    "h2h": 6.0,
+    "odds_movement": 6.0,
 }
 
 # Peso aproximado de una lesión según rol (no tenemos posición real en demo;
@@ -114,10 +115,10 @@ class ConfidenceResult:
 def classify(score: float) -> str:
     if score >= 90:
         return "Elite Pick"
-    if score >= 80:
+    if score >= 85:
         return "Strong Pick"
-    if score >= 70:
-        return "Lean"
+    if score >= 80:
+        return "Value Pick"
     return "No Bet"
 
 
@@ -129,6 +130,14 @@ class ConfidenceModel:
         self.elo = compute_elo()
         self.team_factors = self._load_team_factors()
         self.league = self._league_baselines()
+        self.league_multipliers = self._load_league_multipliers()
+
+    @staticmethod
+    def _load_league_multipliers() -> dict[int, float]:
+        """Multiplicador de confianza por liga (League Analyzer). 1.0 si falta."""
+        df = query_df("SELECT league_id, confidence_multiplier FROM league_ratings")
+        return {int(r.league_id): float(r.confidence_multiplier)
+                for r in df.itertuples()} if not df.empty else {}
 
     # --- carga de datos ----------------------------------------------------
     def _load_played(self) -> pd.DataFrame:
@@ -265,6 +274,15 @@ class ConfidenceModel:
         return _logistic(rel_move, 60.0)
 
     # --- factores individuales --------------------------------------------
+    def _factor_poisson(self, model_prob, implied_prob, selection, market):
+        """Convicción del modelo de Poisson: edge de probabilidad vs mercado."""
+        if model_prob is None:
+            return None
+        if implied_prob is None or implied_prob <= 0:
+            return _logistic(model_prob - 0.5, 4.0)
+        # Cuanto más supera la prob. del modelo a la implícita, mayor el soporte.
+        return _logistic(model_prob - implied_prob, 12.0)
+
     def _factor_xg(self, hf, af, selection, market):
         if market == "1X2":
             net_h = hf.xg_for - hf.xg_against
@@ -334,7 +352,9 @@ class ConfidenceModel:
 
     # --- score final -------------------------------------------------------
     def score(self, fixture_id: int, home_id: int, away_id: int,
-              match_date: str, market: str, selection: str) -> ConfidenceResult:
+              match_date: str, market: str, selection: str,
+              model_prob: float | None = None, implied_prob: float | None = None,
+              league_id: int | None = None) -> ConfidenceResult:
         hf = self.team_factors.get(home_id)
         af = self.team_factors.get(away_id)
         if hf is None or af is None:
@@ -343,6 +363,7 @@ class ConfidenceModel:
         fixture_date = pd.to_datetime(match_date)
 
         values: dict[str, float | None] = {
+            "poisson": self._factor_poisson(model_prob, implied_prob, selection, market),
             "xg": self._factor_xg(hf, af, selection, market),
             "elo": self._factor_elo(home_id, away_id, selection, market),
             "form5": self._factor_form(hf, af, "form5", selection, market),
@@ -369,6 +390,13 @@ class ConfidenceModel:
             breakdown[name] = round(v * 100, 1)
 
         score = (weighted / total_w * 100.0) if total_w else 0.0
+
+        # Ajuste por desempeño histórico de la liga (League Analyzer).
+        mult = self.league_multipliers.get(league_id, 1.0) if league_id else 1.0
+        if mult != 1.0:
+            score = max(0.0, min(100.0, score * mult))
+            breakdown["league_adj"] = round(mult, 3)
+
         score = round(score, 1)
         return ConfidenceResult(score, classify(score), breakdown)
 

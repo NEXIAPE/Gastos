@@ -21,19 +21,21 @@ def log_value_bets() -> int:
     inserted = 0
     with session() as conn:
         rows = conn.execute(
-            "SELECT vb.id, vb.fixture_id, vb.market, vb.selection, vb.odd, "
-            "       vb.stake_amount "
+            "SELECT vb.id, vb.fixture_id, f.league_id, vb.market, vb.selection, "
+            "       vb.odd, vb.model_prob, vb.ev, vb.stake_amount "
             "FROM value_bets vb "
+            "JOIN fixtures f ON f.id = vb.fixture_id "
             "LEFT JOIN bet_log bl ON bl.value_bet_id = vb.id "
             "WHERE bl.id IS NULL"
         ).fetchall()
         for r in rows:
             conn.execute(
                 "INSERT INTO bet_log "
-                "(value_bet_id, fixture_id, market, selection, odd, stake_amount) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (r["id"], r["fixture_id"], r["market"], r["selection"],
-                 r["odd"], r["stake_amount"]),
+                "(value_bet_id, fixture_id, league_id, market, selection, odd, "
+                " model_prob, ev, stake_amount) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (r["id"], r["fixture_id"], r["league_id"], r["market"], r["selection"],
+                 r["odd"], r["model_prob"], r["ev"], r["stake_amount"]),
             )
             inserted += 1
     return inserted

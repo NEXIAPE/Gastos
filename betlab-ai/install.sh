@@ -36,8 +36,9 @@ echo "==> 5/5  Sembrando datos demo (si no hay claves de API)..."
 if grep -qE '^(API_FOOTBALL_KEY|ODDS_API_KEY)=.+' .env; then
   echo "    Claves detectadas; omito datos demo. Ejecuta: python main.py pipeline"
 else
+  echo "    Generando dataset demo (multi-liga, ~2 años) y backtest..."
   python main.py demo
-  python main.py value
+  python main.py backtest
 fi
 
 cat <<'EOF'
@@ -47,6 +48,10 @@ cat <<'EOF'
 
  Activa el entorno:        source .venv/bin/activate
  Pipeline completo:        python main.py pipeline
+ Estrategia del día:       python main.py strategies
+ Backtesting:              python main.py backtest
+ Clasificar ligas:         python main.py leagues
+ Estado del bankroll:      python main.py bankroll
  Lanzar dashboard:         streamlit run dashboard/app.py
  Reporte diario HTML:      python main.py report  ->  reports/reporte_diario.html
 ===========================================================================

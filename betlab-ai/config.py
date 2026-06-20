@@ -55,8 +55,30 @@ class Settings:
     # EV mínimo para considerar una apuesta de valor (5% -> 0.05).
     min_ev: float = field(default_factory=lambda: _get_float("MIN_EV", 0.05))
     # Score de confianza mínimo (0-100) para mostrar una apuesta.
-    # 80 => solo Strong Picks (80-89) y Elite Picks (90-100).
+    # 80 => Value Pick (80-84), Strong (85-89) y Elite (90-100).
     min_confidence: float = field(default_factory=lambda: _get_float("MIN_CONFIDENCE", 80.0))
+    # Diferencia mínima |prob_modelo - prob_implícita| (No Bet si es menor).
+    min_prob_edge: float = field(default_factory=lambda: _get_float("MIN_PROB_EDGE", 0.03))
+    # Rango de cuota elegible para estrategias/combinadas.
+    odd_min: float = field(default_factory=lambda: _get_float("ODD_MIN", 1.40))
+    odd_max: float = field(default_factory=lambda: _get_float("ODD_MAX", 2.20))
+
+    # --- No Bet Engine ------------------------------------------------------
+    # Nº de bajas importantes a partir del cual se marca NO BET.
+    max_key_injuries: int = field(default_factory=lambda: int(_get_float("MAX_KEY_INJURIES", 3)))
+    # Mínimo de partidos históricos por equipo para considerar info suficiente.
+    min_history_matches: int = field(default_factory=lambda: int(_get_float("MIN_HISTORY", 5)))
+
+    # --- Bankroll Manager ---------------------------------------------------
+    # Caída de bankroll que reduce stakes al 50%.
+    drawdown_reduce: float = field(default_factory=lambda: _get_float("DD_REDUCE", 0.10))
+    # Caída que activa modo conservación.
+    drawdown_conserve: float = field(default_factory=lambda: _get_float("DD_CONSERVE", 0.20))
+    # En modo conservación: confianza mínima y stake máximo.
+    conserve_min_confidence: float = field(
+        default_factory=lambda: _get_float("CONSERVE_MIN_CONF", 90.0))
+    conserve_max_stake_pct: float = field(
+        default_factory=lambda: _get_float("CONSERVE_MAX_STAKE", 0.01))
 
     # --- Kelly Criterion ----------------------------------------------------
     # Fracción de Kelly aplicada (25% -> 0.25).

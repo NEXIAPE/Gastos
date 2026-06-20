@@ -73,12 +73,14 @@ def _best_odds() -> pd.DataFrame:
 
 def _pending_fixtures() -> pd.DataFrame:
     sql = """
-        SELECT f.id AS fixture_id, f.match_date,
+        SELECT f.id AS fixture_id, f.match_date, f.league_id,
                f.home_team_id, f.away_team_id,
-               th.name AS home_name, ta.name AS away_name
+               th.name AS home_name, ta.name AS away_name,
+               lg.name AS league_name
         FROM fixtures f
         JOIN teams th ON th.id = f.home_team_id
         JOIN teams ta ON ta.id = f.away_team_id
+        LEFT JOIN leagues lg ON lg.id = f.league_id
         WHERE f.status = 'NS'
         ORDER BY f.match_date
     """
@@ -111,12 +113,23 @@ def detect_value_bets(min_ev: float | None = None,
                       min_confidence: float | None = None,
                       persist: bool = True) -> list[ValueBet]:
     """
-    Detecta value bets que cumplen DOS filtros:
-      * EV > min_ev (apuesta de valor), y
-      * Score de Confianza >= min_confidence (por defecto 80 => Strong/Elite).
+    Detecta value bets que superan TODOS los filtros del sistema:
+      * No Bet Engine no descarta el partido (bajas, info, amistoso, ...).
+      * EV > min_ev (apuesta de valor).
+      * |prob_modelo - prob_implícita| >= min_prob_edge.
+      * Score de Confianza >= mínimo activo (sube a 90 en modo conservación).
+
+    El stake aplica las reglas del Bankroll Manager (reducción / conservación).
     """
+    from models.bankroll import apply_risk_rules, get_state
+    from models.nobet import NoBetEngine
+
     min_ev = settings.min_ev if min_ev is None else min_ev
-    min_confidence = settings.min_confidence if min_confidence is None else min_confidence
+
+    state = get_state()
+    # En modo conservación se exige más confianza (>90).
+    if min_confidence is None:
+        min_confidence = state.min_confidence
 
     ratings = compute_ratings(persist=True)
     if not ratings:
@@ -129,20 +142,30 @@ def detect_value_bets(min_ev: float | None = None,
 
     league_avg = _league_avg_goals()
     confidence_model = ConfidenceModel()
+    nobet = NoBetEngine()
+    no_bets: list[tuple[int, str, str]] = []
     results: list[ValueBet] = []
 
     for _, fx in fixtures.iterrows():
         home_id, away_id = int(fx["home_team_id"]), int(fx["away_team_id"])
+        league_id = int(fx["league_id"]) if fx["league_id"] is not None else None
+        match_label = f"{fx['home_name']} vs {fx['away_name']}"
+
         home_r = ratings.get(home_id)
         away_r = ratings.get(away_id)
         if not home_r or not away_r:
+            continue
+
+        # --- No Bet Engine: nivel partido ---------------------------------
+        fixture_reasons = nobet.evaluate_fixture(home_id, away_id, fx["league_name"])
+        if fixture_reasons:
+            no_bets.append((int(fx["fixture_id"]), match_label, "; ".join(fixture_reasons)))
             continue
 
         lam_h, lam_a = expected_lambdas(home_r, away_r, league_avg)
         model = PoissonModel(lam_h, lam_a, max_goals=settings.max_goals)
 
         fx_odds = odds[odds["fixture_id"] == fx["fixture_id"]]
-        match_label = f"{fx['home_name']} vs {fx['away_name']}"
 
         for _, o in fx_odds.iterrows():
             prob = _model_prob(model, o["market"], o["selection"])
@@ -150,17 +173,23 @@ def detect_value_bets(min_ev: float | None = None,
                 continue
             odd = float(o["odd"])
             ev = prob * odd - 1.0
-            if ev <= min_ev:
+            implied = 1.0 / odd
+
+            # --- No Bet Engine: nivel selección ---------------------------
+            sel_reasons = nobet.evaluate_selection(prob, implied, ev)
+            if sel_reasons:
                 continue
 
             conf = confidence_model.score(
                 int(fx["fixture_id"]), home_id, away_id,
                 str(fx["match_date"]), o["market"], o["selection"],
+                model_prob=prob, implied_prob=implied, league_id=league_id,
             )
             if conf.score < min_confidence:
-                continue  # solo Strong (80+) y Elite (90+)
+                continue
 
             stake = recommend_stake(prob, odd)
+            stake_amount = apply_risk_rules(stake.stake_amount, stake.stake_pct, state)
             results.append(ValueBet(
                 fixture_id=int(fx["fixture_id"]),
                 match=match_label,
@@ -169,12 +198,12 @@ def detect_value_bets(min_ev: float | None = None,
                 selection=o["selection"],
                 model_prob=round(prob, 4),
                 odd=round(odd, 2),
-                implied_prob=round(1.0 / odd, 4),
+                implied_prob=round(implied, 4),
                 ev=round(ev, 4),
                 confidence=conf.score,
                 tier=conf.tier,
                 stake_pct=stake.stake_pct,
-                stake_amount=stake.stake_amount,
+                stake_amount=stake_amount,
                 risk=stake.risk,
                 factors=conf.breakdown,
             ))
@@ -183,7 +212,7 @@ def detect_value_bets(min_ev: float | None = None,
     results.sort(key=lambda b: (b.confidence, b.ev), reverse=True)
 
     if persist:
-        _persist(results)
+        _persist(results, no_bets)
     return results
 
 
@@ -197,7 +226,7 @@ def _league_avg_goals() -> float:
     return float(df["avg_total"].iloc[0]) / 2.0
 
 
-def _persist(bets: list[ValueBet]) -> None:
+def _persist(bets: list[ValueBet], no_bets: list[tuple[int, str, str]] | None = None) -> None:
     with session() as conn:
         # Reemplaza el set actual de value bets pendientes.
         conn.execute("DELETE FROM value_bets")
@@ -210,6 +239,13 @@ def _persist(bets: list[ValueBet]) -> None:
                 (b.fixture_id, b.market, b.selection, b.model_prob, b.odd,
                  b.implied_prob, b.ev, b.confidence, b.tier,
                  json.dumps(b.factors), b.stake_pct, b.stake_amount),
+            )
+        # Registra los partidos descartados con su motivo (No Bet Engine).
+        conn.execute("DELETE FROM no_bets")
+        for fixture_id, match, reasons in (no_bets or []):
+            conn.execute(
+                "INSERT INTO no_bets (fixture_id, match, reasons) VALUES (?, ?, ?)",
+                (fixture_id, match, reasons),
             )
 
 

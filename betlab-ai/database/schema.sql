@@ -124,9 +124,12 @@ CREATE TABLE IF NOT EXISTS bet_log (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     value_bet_id    INTEGER,
     fixture_id      INTEGER NOT NULL,
+    league_id       INTEGER,
     market          TEXT NOT NULL,
     selection       TEXT NOT NULL,
     odd             REAL NOT NULL,
+    model_prob      REAL,                        -- probabilidad estimada
+    ev              REAL,                        -- expected value
     stake_amount    REAL NOT NULL,
     status          TEXT DEFAULT 'PENDING',      -- PENDING/WON/LOST/VOID
     profit          REAL DEFAULT 0,              -- ganancia neta
@@ -139,3 +142,50 @@ CREATE TABLE IF NOT EXISTS bet_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_betlog_status ON bet_log(status);
+
+-- --- Ratings de ligas (League Analyzer) -------------------------------------
+CREATE TABLE IF NOT EXISTS league_ratings (
+    league_id            INTEGER PRIMARY KEY,
+    roi                  REAL,
+    yield                REAL,
+    accuracy             REAL,
+    ev_hist              REAL,
+    bets                 INTEGER,
+    tier                 TEXT,                   -- Elite/Good/Neutral/Avoid League
+    confidence_multiplier REAL DEFAULT 1.0,      -- ajuste a la confianza futura
+    computed_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (league_id) REFERENCES leagues(id)
+);
+
+-- --- Partidos descartados (No Bet Engine) -----------------------------------
+CREATE TABLE IF NOT EXISTS no_bets (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    fixture_id  INTEGER NOT NULL,
+    match       TEXT,
+    reasons     TEXT,                            -- razones del descarte (texto)
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (fixture_id) REFERENCES fixtures(id)
+);
+
+-- --- Estado del bankroll (Bankroll Manager) ---------------------------------
+CREATE TABLE IF NOT EXISTS bankroll_state (
+    id               INTEGER PRIMARY KEY CHECK (id = 1),  -- fila única
+    initial_bankroll REAL NOT NULL,
+    current_bankroll REAL NOT NULL,
+    mode             TEXT DEFAULT 'NORMAL',      -- NORMAL/REDUCED/CONSERVATION
+    stake_multiplier REAL DEFAULT 1.0,
+    updated_at       TEXT DEFAULT (datetime('now'))
+);
+
+-- --- Resultados de backtesting ----------------------------------------------
+CREATE TABLE IF NOT EXISTS backtest_results (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    model       TEXT NOT NULL,                   -- Poisson / Poisson+Elo / ...
+    accuracy    REAL,
+    roi         REAL,
+    yield       REAL,
+    drawdown    REAL,
+    profit      REAL,
+    bets        INTEGER,
+    run_at      TEXT DEFAULT (datetime('now'))
+);

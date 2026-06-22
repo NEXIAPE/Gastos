@@ -65,6 +65,10 @@ class Settings:
     # soccer_epl, soccer_spain_la_liga, upcoming). Solo aplica a esa fuente.
     odds_sport: str = field(default_factory=lambda: os.getenv("ODDS_SPORT", "upcoming"))
     odds_regions: str = field(default_factory=lambda: os.getenv("ODDS_REGIONS", "eu"))
+    # football-data.org: fuente gratuita con temporadas ACTUALES (incl. Mundial).
+    footballdata_token: str = field(default_factory=lambda: _get_secret("FOOTBALLDATA_TOKEN"))
+    # Código de competición de football-data.org (WC, PL, PD, CL, SA, BL1, FL1...).
+    fd_competition: str = field(default_factory=lambda: (os.getenv("FD_COMPETITION", "") or "").strip())
     # Filtro opcional de ingesta para no agotar la cuota de la API: limita la
     # descarga a una liga/competición y temporada concretas. Mundial -> 1 / 2026.
     league_id: int | None = field(

@@ -41,10 +41,34 @@ def log_value_bets() -> int:
     return inserted
 
 
+def get_deposit() -> float:
+    """Capital inicial (depósito) que el usuario cargó para su traza."""
+    df = query_df("SELECT value FROM app_settings WHERE key = 'deposit'")
+    if df.empty:
+        return 0.0
+    try:
+        return float(df["value"].iloc[0])
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def set_deposit(amount: float) -> None:
+    with session() as conn:
+        conn.execute(
+            "INSERT INTO app_settings (key, value) VALUES ('deposit', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (str(float(amount)),))
+
+
 def log_manual_bet(description: str, odd: float, stake: float,
                    market: str = "MANUAL", selection: str = "-") -> int:
     """Registra una apuesta cargada a mano por el usuario (queda PENDING)."""
     with session() as conn:
+        # Garantiza el partido "sentinela" (id 0) por si fue borrado en un reseed.
+        conn.execute("INSERT OR IGNORE INTO teams (id, name) VALUES (0, 'Manual')")
+        conn.execute(
+            "INSERT OR IGNORE INTO fixtures (id, match_date, status, home_team_id, away_team_id) "
+            "VALUES (0, '', 'MANUAL', 0, 0)")
         cur = conn.execute(
             "INSERT INTO bet_log (fixture_id, market, selection, odd, stake_amount, "
             " status, note, manual) VALUES (0, ?, ?, ?, ?, 'PENDING', ?, 1)",
@@ -201,7 +225,7 @@ def roi_metrics() -> dict[str, float]:
     """Métricas agregadas sobre apuestas liquidadas."""
     df = query_df(
         "SELECT stake_amount, profit, status FROM bet_log "
-        "WHERE status IN ('WON', 'LOST', 'VOID')"
+        "WHERE status IN ('WON', 'LOST', 'VOID') AND manual = 0"
     )
     if df.empty:
         return {"bets": 0, "staked": 0.0, "profit": 0.0,
@@ -224,6 +248,7 @@ def bankroll_curve(starting_bankroll: float = 1000.0) -> pd.DataFrame:
     df = query_df(
         "SELECT settled_at, profit FROM bet_log "
         "WHERE status IN ('WON', 'LOST', 'VOID') AND settled_at IS NOT NULL "
+        "  AND manual = 0 "
         "ORDER BY settled_at"
     )
     if df.empty:

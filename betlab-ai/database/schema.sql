@@ -192,3 +192,9 @@ CREATE TABLE IF NOT EXISTS backtest_results (
     bets        INTEGER,
     run_at      TEXT DEFAULT (datetime('now'))
 );
+
+-- --- Ajustes de la app (clave/valor): depósito/capital inicial, etc. --------
+CREATE TABLE IF NOT EXISTS app_settings (
+    key     TEXT PRIMARY KEY,
+    value   TEXT
+);

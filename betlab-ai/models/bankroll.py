@@ -51,6 +51,7 @@ def _equity_curve(initial: float) -> tuple[float, float]:
     df = query_df(
         "SELECT profit FROM bet_log "
         "WHERE status IN ('WON','LOST','VOID') AND settled_at IS NOT NULL "
+        "  AND manual = 0 "
         "ORDER BY settled_at, id"
     )
     bankroll = initial

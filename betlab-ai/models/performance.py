@@ -38,7 +38,7 @@ def _settled() -> pd.DataFrame:
         "LEFT JOIN fixtures f ON f.id = bl.fixture_id "
         "LEFT JOIN teams th ON th.id = f.home_team_id "
         "LEFT JOIN teams ta ON ta.id = f.away_team_id "
-        "WHERE bl.status IN ('WON','LOST','VOID') "
+        "WHERE bl.status IN ('WON','LOST','VOID') AND bl.manual = 0 "
         "ORDER BY bl.settled_at, bl.id"
     )
 

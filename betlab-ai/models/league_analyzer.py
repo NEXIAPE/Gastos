@@ -44,7 +44,8 @@ def _league_stats() -> pd.DataFrame:
         "       AVG(bl.ev) AS ev_hist "
         "FROM bet_log bl "
         "LEFT JOIN leagues lg ON lg.id = bl.league_id "
-        "WHERE bl.status IN ('WON','LOST') "
+        "WHERE bl.status IN ('WON','LOST') AND bl.manual = 0 "
+        "  AND bl.league_id IS NOT NULL "
         "GROUP BY bl.league_id"
     )
 

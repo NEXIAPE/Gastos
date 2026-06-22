@@ -252,26 +252,37 @@ def main() -> None:
 
 def _tab_my_bets(rep) -> None:
     """Registro personal de apuestas (la traza): cargar, editar, marcar resultado."""
-    from models.roi import (log_manual_bet, manual_bets, manual_ledger,
-                            set_bet_status, update_bet)
+    from models.roi import (get_deposit, log_manual_bet, manual_bets, manual_ledger,
+                            set_bet_status, set_deposit, update_bet)
 
     st.subheader("🧾 Mis Apuestas")
     st.caption("Anotá las apuestas que hacés de verdad. Podés **editar cuota, stake y "
-               "estado** en la tabla (la cuota real de tu casa suele diferir un poco). "
-               "El balance arranca en 0.")
+               "estado** en la tabla (la cuota real de tu casa suele diferir un poco).")
 
-    led = manual_ledger(start=0.0)
+    deposit = get_deposit()
+    with st.expander("💰 Capital inicial (depósito)", expanded=(deposit == 0)):
+        st.caption("Cuánta plata pusiste para apostar. El «Dinero actual» = "
+                   "este capital + tu ganancia/pérdida.")
+        c = st.columns([3, 1])
+        new_dep = c[0].number_input(f"Capital ({CUR})", min_value=0.0,
+                                    value=float(deposit), step=10.0)
+        if c[1].button("Guardar capital"):
+            set_deposit(new_dep)
+            st.rerun()
+
+    led = manual_ledger(start=deposit)
     k = st.columns(4)
-    k[0].metric("Balance", f"{led['balance']:.2f}{CUR}",
-                help="Tu ganancia/pérdida neta acumulada, desde 0.")
+    k[0].metric("💵 Dinero actual", f"{led['balance']:.2f}{CUR}",
+                f"{led['profit']:+.2f}{CUR}",
+                help="Tu capital inicial + la ganancia/pérdida acumulada.")
     k[1].metric("Pendiente", f"{led['pending_stake']:.2f}{CUR}",
                 help="Dinero en apuestas todavía sin resultado.")
     k[2].metric("Apostado", f"{led['staked']:.2f}{CUR}",
                 help="Total apostado en apuestas ya resueltas.")
     k[3].metric("ROI", f"{led['roi']*100:.1f}%",
                 help="Rentabilidad sobre lo apostado. Positivo = ganás.")
-    st.caption(f"✅ Ganadas: {led['won']}  ·  ❌ Perdidas: {led['lost']}  ·  "
-               f"⏳ Pendientes: {led['pending']}")
+    st.caption(f"Capital inicial: {deposit:.2f}{CUR}  ·  Ganancia neta: {led['profit']:+.2f}{CUR}  "
+               f"·  ✅ {led['won']} ganadas · ❌ {led['lost']} perdidas · ⏳ {led['pending']} pendientes")
 
     # --- Registrar una apuesta (single o combinada) ---
     with st.expander("➕ Registrar una apuesta nueva", expanded=False):

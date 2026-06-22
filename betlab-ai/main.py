@@ -43,7 +43,9 @@ def cmd_demo(_args) -> None:
 def cmd_ingest(args) -> None:
     from services.data_ingestion import ingest
 
-    summary = ingest(target_date=args.date)
+    league = args.league if args.league is not None else settings.league_id
+    season = args.season if args.season is not None else settings.season
+    summary = ingest(target_date=args.date, league=league, season=season)
     if summary.get("demo"):
         print("⚠ Sin claves de API: se generaron datos demo.")
     else:
@@ -204,8 +206,10 @@ def cmd_pipeline(args) -> None:
     from reports.report_generator import generate_report
     from services.data_ingestion import ingest
 
+    league = args.league if args.league is not None else settings.league_id
+    season = args.season if args.season is not None else settings.season
     print("→ 1/7 Ingesta de datos y cuotas...")
-    summary = ingest(target_date=args.date)
+    summary = ingest(target_date=args.date, league=league, season=season)
     print(f"   {summary}")
 
     print("→ 2/7 Liquidando apuestas con resultado conocido...")
@@ -247,10 +251,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("pipeline", help="Ejecuta todo el pipeline.")
     p.add_argument("--date", default=None, help="Fecha YYYY-MM-DD (def: hoy).")
+    p.add_argument("--league", type=int, default=None,
+                   help="ID de liga/competición para limitar la ingesta (Mundial=1).")
+    p.add_argument("--season", type=int, default=None, help="Temporada, ej. 2026.")
     p.set_defaults(func=cmd_pipeline)
 
     p = sub.add_parser("ingest", help="Ingesta de datos y cuotas.")
     p.add_argument("date", nargs="?", default=None, help="Fecha YYYY-MM-DD.")
+    p.add_argument("--league", type=int, default=None,
+                   help="ID de liga/competición (Mundial=1).")
+    p.add_argument("--season", type=int, default=None, help="Temporada, ej. 2026.")
     p.set_defaults(func=cmd_ingest)
 
     sub.add_parser("value", help="Detecta value bets.").set_defaults(func=cmd_value)

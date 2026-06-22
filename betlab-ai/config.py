@@ -57,6 +57,14 @@ class Settings:
     # soccer_epl, soccer_spain_la_liga, upcoming). Solo aplica a esa fuente.
     odds_sport: str = field(default_factory=lambda: os.getenv("ODDS_SPORT", "upcoming"))
     odds_regions: str = field(default_factory=lambda: os.getenv("ODDS_REGIONS", "eu"))
+    # Filtro opcional de ingesta para no agotar la cuota de la API: limita la
+    # descarga a una liga/competición y temporada concretas. Mundial -> 1 / 2026.
+    league_id: int | None = field(
+        default_factory=lambda: int(os.environ["LEAGUE_ID"]) if os.getenv("LEAGUE_ID") else None
+    )
+    season: int | None = field(
+        default_factory=lambda: int(os.environ["SEASON"]) if os.getenv("SEASON") else None
+    )
 
     # --- Value Bet Engine ---------------------------------------------------
     # EV mínimo para considerar una apuesta de valor (5% -> 0.05).

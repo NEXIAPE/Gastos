@@ -17,7 +17,11 @@ from datetime import date as date_cls
 
 from config import settings
 from database import init_db, session, upsert
-from services.api_football import APIFootballClient, parse_statistic_value
+from services.api_football import (
+    APIFootballClient,
+    normalize_apifootball_odds,
+    parse_statistic_value,
+)
 from services.odds_api import OddsAPIClient, normalize_event_odds
 
 
@@ -43,6 +47,10 @@ def ingest(target_date: str | None = None, league: int | None = None,
 
     counts = {"fixtures": 0, "stats": 0, "odds": 0, "injuries": 0}
 
+    # Si hay clave de The Odds API se usa esa fuente; si no, las cuotas se
+    # toman del propio API-Football (mismo proveedor que los fixtures).
+    use_oddsapi = odds.enabled
+
     with session() as conn:
         # --- Module 1: fixtures + estadísticas ----------------------------
         fixtures = football.get_fixtures_by_date(target_date, league, season)
@@ -66,21 +74,34 @@ def ingest(target_date: str | None = None, league: int | None = None,
                     )
                     counts["injuries"] += 1
 
-        # --- Module 2: cuotas ---------------------------------------------
-        events = odds.get_odds(markets="h2h,totals,spreads")
-        fixtures_by_teams = _index_fixtures(conn)
-        for event in events:
-            fixture_id = _match_event_to_fixture(event, fixtures_by_teams)
-            if fixture_id is None:
-                continue
-            for row in normalize_event_odds(event):
-                conn.execute(
-                    "INSERT INTO odds (fixture_id, bookmaker, market, selection, odd) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (fixture_id, row["bookmaker"], row["market"],
-                     row["selection"], row["odd"]),
-                )
-                counts["odds"] += 1
+            # --- Module 2a: cuotas vía API-Football (por fixture) ---------
+            if not use_oddsapi:
+                events = football.get_odds_by_fixture(fixture_id)
+                for row in normalize_apifootball_odds(events):
+                    conn.execute(
+                        "INSERT INTO odds (fixture_id, bookmaker, market, selection, odd) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (fixture_id, row["bookmaker"], row["market"],
+                         row["selection"], row["odd"]),
+                    )
+                    counts["odds"] += 1
+
+        # --- Module 2b: cuotas vía The Odds API ---------------------------
+        if use_oddsapi:
+            events = odds.get_odds(markets="h2h,totals,spreads")
+            fixtures_by_teams = _index_fixtures(conn)
+            for event in events:
+                fixture_id = _match_event_to_fixture(event, fixtures_by_teams)
+                if fixture_id is None:
+                    continue
+                for row in normalize_event_odds(event):
+                    conn.execute(
+                        "INSERT INTO odds (fixture_id, bookmaker, market, selection, odd) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (fixture_id, row["bookmaker"], row["market"],
+                         row["selection"], row["odd"]),
+                    )
+                    counts["odds"] += 1
 
     counts["mode"] = 1
     return counts

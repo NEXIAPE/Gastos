@@ -76,6 +76,10 @@ class APIFootballClient:
     def get_injuries(self, fixture: int) -> list[dict[str, Any]]:
         return self._get("injuries", {"fixture": fixture})
 
+    def get_odds_by_fixture(self, fixture: int) -> list[dict[str, Any]]:
+        """Cuotas pre-partido de un fixture (varias casas y mercados)."""
+        return self._get("odds", {"fixture": fixture})
+
     def get_team_form(self, team: int, league: int, season: int,
                       last: int = 5) -> list[dict[str, Any]]:
         """Últimos N partidos de un equipo (forma reciente)."""
@@ -83,6 +87,66 @@ class APIFootballClient:
             "fixtures",
             {"team": team, "league": league, "season": season, "last": last},
         )
+
+
+def normalize_apifootball_odds(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Convierte la respuesta del endpoint /odds de API-Football a filas internas
+    {bookmaker, market, selection, odd}, con el mismo vocabulario que usa el
+    modelo (1X2 HOME/DRAW/AWAY · OU_2.5 OVER/UNDER · BTTS YES/NO).
+    """
+    rows: list[dict[str, Any]] = []
+    for event in events or []:
+        for bk in event.get("bookmakers", []):
+            bk_name = bk.get("name", str(bk.get("id", "")))
+            for bet in bk.get("bets", []):
+                bname = (bet.get("name") or "").strip().lower()
+                for val in bet.get("values", []):
+                    raw = (val.get("value") or "").strip()
+                    try:
+                        odd = float(val.get("odd"))
+                    except (TypeError, ValueError):
+                        continue
+                    selection, market_label = _map_apifootball_value(bname, raw)
+                    if selection is None:
+                        continue
+                    rows.append({
+                        "bookmaker": bk_name,
+                        "market": market_label,
+                        "selection": selection,
+                        "odd": odd,
+                    })
+    return rows
+
+
+def _map_apifootball_value(bet_name: str, value: str) -> tuple[str | None, str]:
+    """Mapea (nombre de apuesta, valor) de API-Football al formato interno."""
+    v = value.strip().lower()
+
+    if bet_name == "match winner":          # 1X2
+        if v == "home":
+            return "HOME", "1X2"
+        if v == "draw":
+            return "DRAW", "1X2"
+        if v == "away":
+            return "AWAY", "1X2"
+        return None, "1X2"
+
+    if bet_name == "goals over/under":       # Over/Under (solo línea 2.5)
+        if v == "over 2.5":
+            return "OVER", "OU_2.5"
+        if v == "under 2.5":
+            return "UNDER", "OU_2.5"
+        return None, "OU_2.5"
+
+    if bet_name == "both teams score":       # BTTS
+        if v == "yes":
+            return "YES", "BTTS"
+        if v == "no":
+            return "NO", "BTTS"
+        return None, "BTTS"
+
+    return None, bet_name
 
 
 def parse_statistic_value(stats: list[dict[str, Any]], wanted: str) -> float | None:

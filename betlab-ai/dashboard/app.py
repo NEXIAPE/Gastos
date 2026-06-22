@@ -382,54 +382,67 @@ def _tab_strategy(rep, state) -> None:
                    + ("stakes reducidos al 50%." if state.mode == "REDUCED"
                       else "solo picks confianza > 90, stake máx 1% y SIN combinadas."))
 
+    from models.roi import log_manual_bet
+
+    # Monto por jugada: cada botón "Apostar" registra el pick en Mis Apuestas.
+    sc = st.columns([1, 2])
+    stake_def = sc[0].number_input(f"💵 Monto por jugada ({CUR})", min_value=0.0,
+                                   value=5.0, step=1.0,
+                                   help="Cuánto apostás en cada pick que registres.")
+    sc[1].caption("Tocá **➕ Apostar** en cualquier pick o combinada y queda guardado en "
+                  "**🧾 Mis Apuestas** (después podés editar cuota/monto ahí).")
+
+    def _bet(desc, odd, key):
+        if st.button("➕ Apostar", key=key, use_container_width=True):
+            log_manual_bet(desc, float(odd), float(stake_def))
+            st.toast(f"Registrado en Mis Apuestas: {desc[:40]}… ✅")
+
     # A) Pick premium
     if rep.premium:
         b = rep.premium
-        st.markdown(f"### 🏅 A) Pick Premium del día")
-        st.success(f"**{b.match}**  \n"
-                   f"👉 **Apostá a: {describe_pick(b.match, b.market, b.selection)}**  \n"
-                   f"Cuota **{b.odd}** · Prob **{b.model_prob:.0%}** · EV **+{b.ev:.1%}** · "
-                   f"Confianza **{b.confidence:.0f}** [{b.tier}] · Stake **{b.stake_amount:.2f}{CUR}** · Riesgo {b.risk}")
-        st.caption(f"Apostá {b.stake_amount:.2f}{CUR} a «{describe_pick(b.match, b.market, b.selection)}» "
-                   f"en tu casa de apuestas. Si acierta, cobrás {b.stake_amount * b.odd:.2f}{CUR}.")
-    else:
-        st.info("A) Pick Premium: no hay pick elegible hoy.")
+        desc = f"{b.match} · {describe_pick(b.match, b.market, b.selection)}"
+        st.markdown("### 🏅 Pick Premium del día")
+        c = st.columns([4, 1])
+        c[0].success(f"**{b.match}**  \n"
+                     f"👉 **Apostá a: {describe_pick(b.match, b.market, b.selection)}**  \n"
+                     f"Cuota **{b.odd}** · EV **+{b.ev:.1%}** · Confianza **{b.confidence:.0f}** "
+                     f"[{b.tier}]  ·  si ganás cobrás **{stake_def * b.odd:.2f}{CUR}**")
+        with c[1]:
+            _bet(desc, b.odd, "bet_premium")
 
     # B) Top 5
-    st.markdown("### 📋 B) Top 5 Value Bets")
+    st.markdown("### 📋 Top 5 Value Bets")
     if rep.top5:
-        df = pd.DataFrame([{
-            "Partido": b.match,
-            "Qué apostar": describe_pick(b.match, b.market, b.selection),
-            "Cuota": b.odd, "Prob": f"{b.model_prob:.0%}", "EV": f"+{b.ev:.1%}",
-            "Confianza": int(b.confidence), "Tier": b.tier,
-            "Stake": f"{b.stake_amount:.2f}{CUR}", "Riesgo": b.risk,
-        } for b in rep.top5])
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        st.caption("**«Qué apostar»** es exactamente lo que marcás en la casa de apuestas. "
-                   "**Stake** = cuánto poner en cada una.")
+        for i, b in enumerate(rep.top5):
+            desc = f"{b.match} · {describe_pick(b.match, b.market, b.selection)}"
+            c = st.columns([5, 2, 1])
+            c[0].markdown(f"**{b.match}**  \n👉 {describe_pick(b.match, b.market, b.selection)}")
+            c[1].markdown(f"Cuota **{b.odd}** · EV +{b.ev:.1%}  \nConfianza {b.confidence:.0f}")
+            with c[2]:
+                _bet(desc, b.odd, f"bet_t{i}")
+            st.divider()
     else:
         st.info("No hay value bets elegibles hoy.")
 
     # C/D/E) Combinadas
     st.markdown("### 🎰 Combinadas")
     if rep.parlays_blocked:
-        st.error("Combinadas bloqueadas por el modo CONSERVACIÓN del bankroll.")
+        st.error("Combinadas bloqueadas por el modo de riesgo (conservación).")
     elif not rep.has_combos:
-        st.warning("**NO HAY COMBINADAS DE VALOR HOY.**")
+        st.warning("No hay combinadas de valor hoy.")
     else:
-        names = {"Conservadora": "C) Conservadora (máx 2)",
-                 "Moderada": "D) Moderada (máx 3)", "Agresiva": "E) Agresiva (máx 5)"}
+        names = {"Conservadora": "🛡️ Conservadora", "Moderada": "⚖️ Moderada",
+                 "Agresiva": "🔥 Agresiva"}
         cols = st.columns(len(rep.parlays))
         for col, p in zip(cols, rep.parlays):
             with col:
                 st.markdown(f"**{names.get(p.name, p.name)}**")
                 for leg in p.legs:
-                    st.caption(f"• {leg.match}  \n  → {describe_pick(leg.match, leg.market, leg.selection)} "
+                    st.caption(f"• {describe_pick(leg.match, leg.market, leg.selection)} "
                                f"@ {leg.odd}")
-                st.metric("Cuota total", f"{p.total_odd:.2f}",
-                          f"EV +{p.ev:.0%} · {p.risk}")
-                st.caption(f"Prob. conjunta {p.joint_prob:.1%}")
+                st.metric("Cuota total", f"{p.total_odd:.2f}", f"EV +{p.ev:.0%} · {p.risk}")
+                legs = " + ".join(describe_pick(l.match, l.market, l.selection) for l in p.legs)
+                _bet(f"Combinada {p.name}: {legs}", p.total_odd, f"bet_combo_{p.name}")
 
 
 def _tab_performance() -> None:

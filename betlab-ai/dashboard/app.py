@@ -153,13 +153,14 @@ def main() -> None:
             if cols[1].button("Salir"):
                 st.session_state.clear()
                 st.rerun()
-        st.header("Bankroll Manager")
-        st.metric("Bankroll", f"{state.current:.0f}{CUR}", f"{(state.current - state.initial):+.0f}{CUR}")
-        st.write(f"**Modo:** {MODE_COLOR.get(state.mode,'')} {state.mode}")
-        st.progress(min(1.0, max(0.0, 1 - state.drawdown)),
-                    text=f"Drawdown {state.drawdown:.1%} (peak {state.peak:.0f}{CUR})")
-        st.caption(f"stake ×{state.stake_multiplier} · conf. mín. {state.min_confidence:.0f} · "
-                   f"combinadas {'sí' if state.allow_parlays else 'NO'}")
+        from models.roi import get_deposit, manual_ledger
+        _led = manual_ledger(start=get_deposit())
+        st.header("💰 Mi dinero")
+        st.metric("Balance actual", f"{_led['balance']:.2f}{CUR}",
+                  f"{_led['profit']:+.2f}{CUR}")
+        if _led["pending_stake"] > 0:
+            st.caption(f"⏳ {_led['pending_stake']:.2f}{CUR} en apuestas pendientes")
+        st.caption("Tu capital + ganancias. Lo configurás en «🧾 Mis Apuestas».")
         st.divider()
         st.subheader("📥 Datos")
         league_name = st.selectbox("Liga / competición", list(LEAGUES), index=0)
@@ -384,42 +385,38 @@ def _tab_strategy(rep, state) -> None:
 
     from models.roi import log_manual_bet
 
-    # Monto por jugada: cada botón "Apostar" registra el pick en Mis Apuestas.
-    sc = st.columns([1, 2])
-    stake_def = sc[0].number_input(f"💵 Monto por jugada ({CUR})", min_value=0.0,
-                                   value=5.0, step=1.0,
-                                   help="Cuánto apostás en cada pick que registres.")
-    sc[1].caption("Tocá **➕ Apostar** en cualquier pick o combinada y queda guardado en "
-                  "**🧾 Mis Apuestas** (después podés editar cuota/monto ahí).")
+    st.caption("En cada pick poné **cuánto querés apostar** y tocá **➕ Apostar**: "
+               "queda guardado en **🧾 Mis Apuestas** (editable después).")
 
-    def _bet(desc, odd, key):
-        if st.button("➕ Apostar", key=key, use_container_width=True):
-            log_manual_bet(desc, float(odd), float(stake_def))
-            st.toast(f"Registrado en Mis Apuestas: {desc[:40]}… ✅")
+    def _bet_controls(desc, odd, key):
+        stake = st.number_input(f"Monto ({CUR})", min_value=0.0, value=5.0, step=1.0,
+                                key=f"stk_{key}", label_visibility="collapsed")
+        if st.button("➕ Apostar", key=f"btn_{key}", use_container_width=True):
+            log_manual_bet(desc, float(odd), float(stake))
+            st.toast(f"Registrado en Mis Apuestas: {desc[:38]}… ✅")
 
     # A) Pick premium
     if rep.premium:
         b = rep.premium
         desc = f"{b.match} · {describe_pick(b.match, b.market, b.selection)}"
         st.markdown("### 🏅 Pick Premium del día")
-        c = st.columns([4, 1])
+        c = st.columns([4, 1.4])
         c[0].success(f"**{b.match}**  \n"
                      f"👉 **Apostá a: {describe_pick(b.match, b.market, b.selection)}**  \n"
-                     f"Cuota **{b.odd}** · EV **+{b.ev:.1%}** · Confianza **{b.confidence:.0f}** "
-                     f"[{b.tier}]  ·  si ganás cobrás **{stake_def * b.odd:.2f}{CUR}**")
+                     f"Cuota **{b.odd}** · EV **+{b.ev:.1%}** · Confianza **{b.confidence:.0f}** [{b.tier}]")
         with c[1]:
-            _bet(desc, b.odd, "bet_premium")
+            _bet_controls(desc, b.odd, "premium")
 
     # B) Top 5
     st.markdown("### 📋 Top 5 Value Bets")
     if rep.top5:
         for i, b in enumerate(rep.top5):
             desc = f"{b.match} · {describe_pick(b.match, b.market, b.selection)}"
-            c = st.columns([5, 2, 1])
+            c = st.columns([4, 1.4, 1.4])
             c[0].markdown(f"**{b.match}**  \n👉 {describe_pick(b.match, b.market, b.selection)}")
-            c[1].markdown(f"Cuota **{b.odd}** · EV +{b.ev:.1%}  \nConfianza {b.confidence:.0f}")
+            c[1].markdown(f"Cuota **{b.odd}**  \nEV +{b.ev:.1%} · conf {b.confidence:.0f}")
             with c[2]:
-                _bet(desc, b.odd, f"bet_t{i}")
+                _bet_controls(desc, b.odd, f"t{i}")
             st.divider()
     else:
         st.info("No hay value bets elegibles hoy.")
@@ -442,7 +439,7 @@ def _tab_strategy(rep, state) -> None:
                                f"@ {leg.odd}")
                 st.metric("Cuota total", f"{p.total_odd:.2f}", f"EV +{p.ev:.0%} · {p.risk}")
                 legs = " + ".join(describe_pick(l.match, l.market, l.selection) for l in p.legs)
-                _bet(f"Combinada {p.name}: {legs}", p.total_odd, f"bet_combo_{p.name}")
+                _bet_controls(f"Combinada {p.name}: {legs}", p.total_odd, f"combo_{p.name}")
 
 
 def _tab_performance() -> None:

@@ -194,6 +194,7 @@ def detect_value_bets(min_ev: float | None = None,
                 int(fx["fixture_id"]), home_id, away_id,
                 str(fx["match_date"]), o["market"], o["selection"],
                 model_prob=prob, implied_prob=implied, league_id=league_id,
+                neutral=neutral,
             )
             if conf.score < min_confidence:
                 continue

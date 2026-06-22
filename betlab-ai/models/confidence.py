@@ -164,6 +164,9 @@ class ConfidenceModel:
             "SELECT team_id, COUNT(*) AS n FROM injuries GROUP BY team_id"
         )
         inj_map = {int(r.team_id): float(r.n) for r in injuries.itertuples()}
+        # Si no hay datos de lesiones en absoluto, el factor no aporta información
+        # y no debe contarse como neutral (evita diluir el score).
+        self._has_injuries = bool(inj_map)
 
         team_ids = pd.unique(df[["home_team_id", "away_team_id"]].values.ravel())
         factors: dict[int, TeamFactors] = {}
@@ -265,11 +268,11 @@ class ConfidenceModel:
             [fixture_id, market, selection],
         )
         if len(df) < 2:
-            return 0.5  # sin histórico de movimiento -> neutral
+            return None  # sin histórico de movimiento -> no se cuenta el factor
         opening = float(df["odd"].iloc[0])
         current = float(df["odd"].iloc[-1])
         if opening <= 0:
-            return 0.5
+            return None
         rel_move = (opening - current) / opening   # >0 si se acortó
         return _logistic(rel_move, 60.0)
 
@@ -311,8 +314,8 @@ class ConfidenceModel:
         return _att(_logistic((h + a) / 2.0 - 0.5, 3.0), selection)
 
     def _factor_injuries(self, hf, af, selection, market):
-        if market != "1X2":
-            return None
+        if market != "1X2" or not getattr(self, "_has_injuries", False):
+            return None  # sin datos de lesiones: no se cuenta el factor
         # Más lesiones del rival favorece a tu equipo.
         diff = af.injuries - hf.injuries
         return _dir(_logistic(diff, 0.8), selection)
@@ -324,16 +327,16 @@ class ConfidenceModel:
         rest_a = (fixture_date - af.last_played).days
         return _dir(_logistic(rest_h - rest_a, 0.4), selection)
 
-    def _factor_home_perf(self, hf, selection, market):
-        if market != "1X2":
-            return None
+    def _factor_home_perf(self, hf, selection, market, neutral=False):
+        if market != "1X2" or neutral:
+            return None  # en cancha neutral no aplica el rendimiento como local
         # Rendimiento como local: apoya HOME, penaliza AWAY.
         s = _logistic(hf.home_pts - 0.5, 5.0)
         return _dir(s, selection)
 
-    def _factor_away_perf(self, af, selection, market):
-        if market != "1X2":
-            return None
+    def _factor_away_perf(self, af, selection, market, neutral=False):
+        if market != "1X2" or neutral:
+            return None  # en cancha neutral no aplica el rendimiento como visitante
         # Rendimiento como visitante: apoya AWAY -> soporte 'local' = 1 - perf.
         s = _logistic(af.away_pts - 0.5, 5.0)
         return _dir(1.0 - s, selection)
@@ -354,7 +357,7 @@ class ConfidenceModel:
     def score(self, fixture_id: int, home_id: int, away_id: int,
               match_date: str, market: str, selection: str,
               model_prob: float | None = None, implied_prob: float | None = None,
-              league_id: int | None = None) -> ConfidenceResult:
+              league_id: int | None = None, neutral: bool = False) -> ConfidenceResult:
         hf = self.team_factors.get(home_id)
         af = self.team_factors.get(away_id)
         if hf is None or af is None:
@@ -370,8 +373,8 @@ class ConfidenceModel:
             "form10": self._factor_form(hf, af, "form10", selection, market),
             "injuries": self._factor_injuries(hf, af, selection, market),
             "fatigue": self._factor_fatigue(hf, af, fixture_date, selection, market),
-            "home_perf": self._factor_home_perf(hf, selection, market),
-            "away_perf": self._factor_away_perf(af, selection, market),
+            "home_perf": self._factor_home_perf(hf, selection, market, neutral),
+            "away_perf": self._factor_away_perf(af, selection, market, neutral),
             "h2h": self._factor_h2h(home_id, away_id, selection, market),
             "odds_movement": _att_or_dir_oddsmove(
                 self._odds_movement(fixture_id, market, selection)

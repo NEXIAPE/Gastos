@@ -55,6 +55,18 @@ def _migrate(conn: sqlite3.Connection) -> None:
     cols = {row[1] for row in conn.execute("PRAGMA table_info(fixtures)").fetchall()}
     if "neutral" not in cols:
         conn.execute("ALTER TABLE fixtures ADD COLUMN neutral INTEGER DEFAULT 0")
+    bl = {row[1] for row in conn.execute("PRAGMA table_info(bet_log)").fetchall()}
+    if "note" not in bl:
+        conn.execute("ALTER TABLE bet_log ADD COLUMN note TEXT")
+    if "manual" not in bl:
+        conn.execute("ALTER TABLE bet_log ADD COLUMN manual INTEGER DEFAULT 0")
+    # Equipo/partido "sentinela" (id 0) para apuestas manuales sin fixture real.
+    # Tiene status 'MANUAL' por lo que queda fuera de las consultas del modelo.
+    conn.execute("INSERT OR IGNORE INTO teams (id, name) VALUES (0, 'Manual')")
+    conn.execute(
+        "INSERT OR IGNORE INTO fixtures (id, match_date, status, home_team_id, away_team_id) "
+        "VALUES (0, '', 'MANUAL', 0, 0)"
+    )
 
 
 def upsert(conn: sqlite3.Connection, table: str, row: dict[str, Any]) -> None:

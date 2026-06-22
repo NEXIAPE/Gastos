@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS bet_log (
     stake_amount    REAL NOT NULL,
     status          TEXT DEFAULT 'PENDING',      -- PENDING/WON/LOST/VOID
     profit          REAL DEFAULT 0,              -- ganancia neta
+    note            TEXT,                        -- descripción (apuestas manuales)
+    manual          INTEGER DEFAULT 0,           -- 1 si la cargó el usuario a mano
     placed_at       TEXT DEFAULT (datetime('now')),
     settled_at      TEXT,
     -- ON DELETE SET NULL: las value bets pendientes se recalculan/borran cada

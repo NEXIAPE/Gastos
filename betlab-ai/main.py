@@ -73,7 +73,7 @@ def cmd_value(_args) -> None:
     for b in bets[:10]:
         print(f"  · {b.match:<30} {fmt_market(b.market):<14} {fmt_selection(b.selection):<8} "
               f"cuota={b.odd:<5} EV=+{b.ev:.1%} conf={b.confidence:>4.0f} "
-              f"[{b.tier}] stake={b.stake_amount:.2f}€")
+              f"[{b.tier}] stake={b.stake_amount:.2f}{settings.currency}")
 
 
 def cmd_report(_args) -> None:
@@ -91,7 +91,7 @@ def cmd_settle(_args) -> None:
     n = settle_by_results()
     m = metrics()
     print(f"✔ {n} apuestas liquidadas. ROI={m['roi']:.1%} yield={m['yield']:.1%} "
-          f"profit={m['profit']:.2f}€")
+          f"profit={m['profit']:.2f}{settings.currency}")
 
 
 def cmd_leagues(_args) -> None:
@@ -113,23 +113,23 @@ def cmd_performance(_args) -> None:
     from models.performance import metrics, profit_by_league, profit_by_market
 
     m = metrics(settings.bankroll)
-    print(f"✔ Performance: bets={m['bets']} profit={m['profit']:.2f}€ "
+    print(f"✔ Performance: bets={m['bets']} profit={m['profit']:.2f}{settings.currency} "
           f"ROI={m['roi']:.1%} yield={m['yield']:.1%} hit={m['hit_rate']:.0%} "
           f"maxDD={m['max_drawdown']:.1%}")
     print("  Profit por mercado:")
     for _, r in profit_by_market().iterrows():
-        print(f"    {r['market']:<8} {r['profit']:+.2f}€ ({int(r['bets'])} bets)")
+        print(f"    {r['market']:<8} {r['profit']:+.2f}{settings.currency} ({int(r['bets'])} bets)")
     print("  Profit por liga:")
     for _, r in profit_by_league().iterrows():
-        print(f"    {r['league']:<24} {r['profit']:+.2f}€ ({int(r['bets'])} bets)")
+        print(f"    {r['league']:<24} {r['profit']:+.2f}{settings.currency} ({int(r['bets'])} bets)")
 
 
 def cmd_bankroll(_args) -> None:
     from models.bankroll import get_state
 
     s = get_state()
-    print(f"✔ Bankroll: {s.current:.2f}€ / inicial {s.initial:.2f}€ "
-          f"(peak {s.peak:.2f}€, drawdown {s.drawdown:.1%})")
+    print(f"✔ Bankroll: {s.current:.2f}{settings.currency} / inicial {s.initial:.2f}{settings.currency} "
+          f"(peak {s.peak:.2f}{settings.currency}, drawdown {s.drawdown:.1%})")
     print(f"  Modo: {s.mode} · stake×{s.stake_multiplier} · "
           f"confianza mínima {s.min_confidence:.0f} · "
           f"combinadas {'sí' if s.allow_parlays else 'NO'}")
@@ -146,7 +146,7 @@ def cmd_backtest(_args) -> None:
     print(f"  {'Modelo':<18}{'Acc':>7}{'ROI':>9}{'Yield':>9}{'MaxDD':>8}{'Profit':>11}{'Bets':>7}")
     for r in results:
         print(f"  {r.model:<18}{r.accuracy:>6.0%}{r.roi:>8.1%}{r.yield_:>8.1%}"
-              f"{r.drawdown:>7.1%}{r.profit:>10.2f}€{r.bets:>7}")
+              f"{r.drawdown:>7.1%}{r.profit:>10.2f}{settings.currency}{r.bets:>7}")
     print(f"  → Modelo más rentable: {best}")
 
 
@@ -168,7 +168,7 @@ def _print_strategies(refresh: bool = False) -> None:
         print(f"\nA) PICK PREMIUM DEL DÍA  ·  {b.match}")
         print(f"   👉 Apostá a: {describe_pick(b.match, b.market, b.selection)}")
         print(f"   cuota {b.odd} | prob {b.model_prob:.0%} | EV +{b.ev:.1%} | conf {b.confidence:.0f} "
-              f"[{b.tier}] | stake {b.stake_amount:.2f}€")
+              f"[{b.tier}] | stake {b.stake_amount:.2f}{settings.currency}")
     else:
         print("\nA) PICK PREMIUM DEL DÍA: no hay pick elegible hoy.")
 
@@ -178,7 +178,7 @@ def _print_strategies(refresh: bool = False) -> None:
     for i, b in enumerate(rep.top5, 1):
         print(f"   {i}. {b.match:<24} → {describe_pick(b.match, b.market, b.selection)}")
         print(f"      cuota {b.odd} · EV +{b.ev:.1%} · conf {b.confidence:.0f} · "
-              f"stake {b.stake_amount:.2f}€")
+              f"stake {b.stake_amount:.2f}{settings.currency}")
 
     labels = {"Conservadora": "C) COMBINADA CONSERVADORA (máx 2)",
               "Moderada": "D) COMBINADA MODERADA (máx 3)",
@@ -217,7 +217,7 @@ def cmd_pipeline(args) -> None:
 
     print("→ 3/7 Bankroll Manager (gestión de riesgo)...")
     state = get_state()
-    print(f"   Modo {state.mode} · bankroll {state.current:.2f}€ · DD {state.drawdown:.1%}")
+    print(f"   Modo {state.mode} · bankroll {state.current:.2f}{settings.currency} · DD {state.drawdown:.1%}")
 
     print("→ 4/7 League Analyzer (clasificación y ajuste de confianza)...")
     league_df = analyze(initial_bankroll=settings.bankroll)

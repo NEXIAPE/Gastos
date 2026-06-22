@@ -51,6 +51,7 @@ from models.strategies import build_strategies, describe_pick, fmt_market, fmt_s
 from services.data_ingestion import ingest  # noqa: E402
 
 st.set_page_config(page_title="BETLAB AI", page_icon="⚽", layout="wide")
+CUR = settings.currency  # símbolo de moneda (soles por defecto)
 
 SEL = {"HOME": "Local", "DRAW": "Empate", "AWAY": "Visitante", "OVER": "Over 2.5",
        "UNDER": "Under 2.5", "YES": "BTTS Sí", "NO": "BTTS No"}
@@ -154,10 +155,10 @@ def main() -> None:
                 st.session_state.clear()
                 st.rerun()
         st.header("Bankroll Manager")
-        st.metric("Bankroll", f"{state.current:.0f}€", f"{(state.current - state.initial):+.0f}€")
+        st.metric("Bankroll", f"{state.current:.0f}{CUR}", f"{(state.current - state.initial):+.0f}{CUR}")
         st.write(f"**Modo:** {MODE_COLOR.get(state.mode,'')} {state.mode}")
         st.progress(min(1.0, max(0.0, 1 - state.drawdown)),
-                    text=f"Drawdown {state.drawdown:.1%} (peak {state.peak:.0f}€)")
+                    text=f"Drawdown {state.drawdown:.1%} (peak {state.peak:.0f}{CUR})")
         st.caption(f"stake ×{state.stake_multiplier} · conf. mín. {state.min_confidence:.0f} · "
                    f"combinadas {'sí' if state.allow_parlays else 'NO'}")
         st.divider()
@@ -207,7 +208,7 @@ def main() -> None:
     c[4].metric("Max DD", f"{perf['max_drawdown'] * 100:.0f}%",
                 help="Máxima caída del bankroll desde un pico (drawdown). "
                      "Cuanto más bajo, mejor.")
-    c[5].metric("Profit", f"{perf['profit']:.0f}€",
+    c[5].metric("Profit", f"{perf['profit']:.0f}{CUR}",
                 help="Ganancia/pérdida total acumulada.")
 
     with st.expander("ℹ️ ¿Cómo leo todo esto? (guía para no expertos)"):
@@ -230,21 +231,93 @@ def main() -> None:
             "la línea (ej. «gana por 2 goles o más»)."
         )
 
-    tabs = st.tabs(["🎯 Estrategia", "📈 Performance", "🏆 Ligas",
+    tabs = st.tabs(["🎯 Estrategia", "🧾 Mis Apuestas", "📈 Performance", "🏆 Ligas",
                     "🧪 Backtest", "🚫 No Bet", "🧬 Factores"])
 
     with tabs[0]:
         _tab_strategy(rep, state)
     with tabs[1]:
-        _tab_performance()
+        _tab_my_bets(rep)
     with tabs[2]:
-        _tab_leagues()
+        _tab_performance()
     with tabs[3]:
-        _tab_backtest()
+        _tab_leagues()
     with tabs[4]:
-        _tab_nobet()
+        _tab_backtest()
     with tabs[5]:
+        _tab_nobet()
+    with tabs[6]:
         _tab_factors(rep)
+
+
+def _tab_my_bets(rep) -> None:
+    """Registro personal de apuestas (la traza): cargar, marcar resultado, balance."""
+    from models.roi import (delete_bet, log_manual_bet, manual_bets,
+                            manual_ledger, settle_bet)
+
+    st.subheader("🧾 Mis Apuestas")
+    st.caption("Anotá las apuestas que hacés de verdad. Después marcás si ganaron o "
+               "perdieron y el balance se actualiza solo. Empieza en 0.")
+
+    led = manual_ledger(start=0.0)
+    k = st.columns(4)
+    k[0].metric("Balance", f"{led['balance']:.2f}{CUR}",
+                help="Tu ganancia/pérdida neta acumulada, desde 0.")
+    k[1].metric("Pendiente", f"{led['pending_stake']:.2f}{CUR}",
+                help="Dinero en apuestas todavía sin resultado.")
+    k[2].metric("Apostado", f"{led['staked']:.2f}{CUR}",
+                help="Total apostado en apuestas ya resueltas.")
+    k[3].metric("ROI", f"{led['roi']*100:.1f}%",
+                help="Rentabilidad sobre lo apostado. Positivo = ganás.")
+    st.caption(f"✅ Ganadas: {led['won']}  ·  ❌ Perdidas: {led['lost']}  ·  "
+               f"⏳ Pendientes: {led['pending']}")
+
+    # --- Cargar una apuesta nueva ---
+    with st.expander("➕ Registrar una apuesta nueva", expanded=False):
+        # Atajo: tomar uno de los picks de hoy
+        pick_opts = {"(escribir a mano)": None}
+        for b in rep.pool[:15]:
+            label = f"{b.match} · {describe_pick(b.match, b.market, b.selection)} (cuota {b.odd})"
+            pick_opts[label] = b
+        choice = st.selectbox("Tomar de los picks de hoy (opcional)", list(pick_opts))
+        base = pick_opts[choice]
+        with st.form("nueva_apuesta", clear_on_submit=True):
+            desc = st.text_input("¿Qué apostaste?",
+                                 value=(f"{base.match} · {describe_pick(base.match, base.market, base.selection)}"
+                                        if base else ""),
+                                 placeholder="Ej: Argentina vs Austria · Gana Argentina")
+            c = st.columns(2)
+            odd = c[0].number_input("Cuota", min_value=1.01, value=float(base.odd) if base else 2.00, step=0.01)
+            stake = c[1].number_input(f"Cuánto apostaste ({CUR})", min_value=0.0, value=10.0, step=1.0)
+            if st.form_submit_button("Guardar apuesta") and desc.strip():
+                log_manual_bet(desc.strip(), odd, stake)
+                st.success("Apuesta registrada como pendiente.")
+                st.rerun()
+
+    # --- Traza: lista de apuestas ---
+    df = manual_bets()
+    if df.empty:
+        st.info("Todavía no registraste apuestas. Usá «Registrar una apuesta nueva».")
+        return
+
+    st.markdown("#### Historial")
+    icon = {"PENDING": "⏳", "WON": "✅", "LOST": "❌", "VOID": "↩️"}
+    for r in df.itertuples():
+        cols = st.columns([5, 2, 2, 3])
+        cols[0].markdown(f"{icon.get(r.status,'')} **{r.note or '-'}**  \n"
+                         f"<small>cuota {r.odd} · apostado {r.stake_amount:.2f}{CUR}"
+                         + (f" · resultado {r.profit:+.2f}{CUR}" if r.status != 'PENDING' else "")
+                         + "</small>", unsafe_allow_html=True)
+        if r.status == "PENDING":
+            if cols[1].button("Ganó ✅", key=f"w{r.id}"):
+                settle_bet(r.id, "WON"); st.rerun()
+            if cols[2].button("Perdió ❌", key=f"l{r.id}"):
+                settle_bet(r.id, "LOST"); st.rerun()
+            if cols[3].button("Anular ↩️", key=f"v{r.id}"):
+                settle_bet(r.id, "VOID"); st.rerun()
+        else:
+            cols[3].button("Borrar 🗑️", key=f"d{r.id}",
+                           on_click=delete_bet, args=(r.id,))
 
 
 def _tab_strategy(rep, state) -> None:
@@ -261,9 +334,9 @@ def _tab_strategy(rep, state) -> None:
         st.success(f"**{b.match}**  \n"
                    f"👉 **Apostá a: {describe_pick(b.match, b.market, b.selection)}**  \n"
                    f"Cuota **{b.odd}** · Prob **{b.model_prob:.0%}** · EV **+{b.ev:.1%}** · "
-                   f"Confianza **{b.confidence:.0f}** [{b.tier}] · Stake **{b.stake_amount:.2f}€** · Riesgo {b.risk}")
-        st.caption(f"Apostá {b.stake_amount:.2f}€ a «{describe_pick(b.match, b.market, b.selection)}» "
-                   f"en tu casa de apuestas. Si acierta, cobrás {b.stake_amount * b.odd:.2f}€.")
+                   f"Confianza **{b.confidence:.0f}** [{b.tier}] · Stake **{b.stake_amount:.2f}{CUR}** · Riesgo {b.risk}")
+        st.caption(f"Apostá {b.stake_amount:.2f}{CUR} a «{describe_pick(b.match, b.market, b.selection)}» "
+                   f"en tu casa de apuestas. Si acierta, cobrás {b.stake_amount * b.odd:.2f}{CUR}.")
     else:
         st.info("A) Pick Premium: no hay pick elegible hoy.")
 
@@ -275,7 +348,7 @@ def _tab_strategy(rep, state) -> None:
             "Qué apostar": describe_pick(b.match, b.market, b.selection),
             "Cuota": b.odd, "Prob": f"{b.model_prob:.0%}", "EV": f"+{b.ev:.1%}",
             "Confianza": int(b.confidence), "Tier": b.tier,
-            "Stake": f"{b.stake_amount:.2f}€", "Riesgo": b.risk,
+            "Stake": f"{b.stake_amount:.2f}{CUR}", "Riesgo": b.risk,
         } for b in rep.top5])
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption("**«Qué apostar»** es exactamente lo que marcás en la casa de apuestas. "
@@ -311,7 +384,7 @@ def _tab_performance() -> None:
         st.info("Sin apuestas liquidadas todavía.")
         return
     fig = px.area(curve, x="settled_at", y="bankroll",
-                  labels={"settled_at": "Fecha", "bankroll": "Bankroll (€)"})
+                  labels={"settled_at": "Fecha", "bankroll": f"Bankroll ({CUR})"})
     fig.update_layout(height=320)
     st.plotly_chart(fig, use_container_width=True)
 
@@ -366,7 +439,7 @@ def _tab_backtest() -> None:
     show = df.copy()
     for col in ("accuracy", "roi", "yield", "drawdown"):
         show[col] = (show[col] * 100).round(1).astype(str) + "%"
-    show["profit"] = show["profit"].round(2).astype(str) + "€"
+    show["profit"] = show["profit"].round(2).astype(str) + " " + CUR
     show = show.rename(columns={"model": "Modelo", "accuracy": "Accuracy", "roi": "ROI",
                                 "yield": "Yield", "drawdown": "Max DD", "profit": "Profit",
                                 "bets": "Bets"})

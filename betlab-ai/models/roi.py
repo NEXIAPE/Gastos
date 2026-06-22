@@ -41,6 +41,56 @@ def log_value_bets() -> int:
     return inserted
 
 
+def log_manual_bet(description: str, odd: float, stake: float,
+                   market: str = "MANUAL", selection: str = "-") -> int:
+    """Registra una apuesta cargada a mano por el usuario (queda PENDING)."""
+    with session() as conn:
+        cur = conn.execute(
+            "INSERT INTO bet_log (fixture_id, market, selection, odd, stake_amount, "
+            " status, note, manual) VALUES (0, ?, ?, ?, ?, 'PENDING', ?, 1)",
+            (market, selection, float(odd), float(stake), description),
+        )
+        return int(cur.lastrowid)
+
+
+def manual_bets() -> "pd.DataFrame":
+    """Todas las apuestas manuales (la traza del usuario), más recientes primero."""
+    return query_df(
+        "SELECT id, note, odd, stake_amount, status, profit, placed_at, settled_at "
+        "FROM bet_log WHERE manual = 1 ORDER BY id DESC"
+    )
+
+
+def manual_ledger(start: float = 0.0) -> dict[str, float]:
+    """Resumen de la traza manual: balance (desde 'start'), pendiente, ROI."""
+    df = query_df(
+        "SELECT status, stake_amount, profit FROM bet_log WHERE manual = 1"
+    )
+    if df.empty:
+        return {"balance": round(start, 2), "pending_stake": 0.0, "staked": 0.0,
+                "profit": 0.0, "roi": 0.0, "won": 0, "lost": 0, "pending": 0}
+    settled = df[df["status"].isin(["WON", "LOST", "VOID"])]
+    staked = float(settled["stake_amount"].sum())
+    profit = float(df["profit"].sum())
+    pending = df[df["status"] == "PENDING"]
+    return {
+        "balance": round(start + profit, 2),
+        "pending_stake": round(float(pending["stake_amount"].sum()), 2),
+        "staked": round(staked, 2),
+        "profit": round(profit, 2),
+        "roi": round(profit / staked, 4) if staked else 0.0,
+        "won": int((df["status"] == "WON").sum()),
+        "lost": int((df["status"] == "LOST").sum()),
+        "pending": int(len(pending)),
+    }
+
+
+def delete_bet(bet_id: int) -> None:
+    """Elimina una apuesta del registro."""
+    with session() as conn:
+        conn.execute("DELETE FROM bet_log WHERE id = ?", (bet_id,))
+
+
 def settle_bet(bet_id: int, status: str) -> None:
     """Liquida una apuesta. status ∈ {WON, LOST, VOID}."""
     status = status.upper()

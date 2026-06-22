@@ -123,6 +123,8 @@ class Settings:
     kelly_fraction: float = field(default_factory=lambda: _get_float("KELLY_FRACTION", 0.25))
     # Bankroll inicial usado para calcular el stake monetario.
     bankroll: float = field(default_factory=lambda: _get_float("BANKROLL", 1000.0))
+    # Símbolo de moneda para mostrar (S/ soles, €, $, etc.).
+    currency: str = field(default_factory=lambda: (os.getenv("CURRENCY", "") or "S/").strip())
     # Tope máximo de stake como % del bankroll (protección).
     max_stake_pct: float = field(default_factory=lambda: _get_float("MAX_STAKE_PCT", 0.10))
 

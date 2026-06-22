@@ -57,11 +57,14 @@ def ingest(target_date: str | None = None, league: int | None = None,
     with session() as conn:
         if fd.enabled:
             # --- Fuente: football-data.org (fixtures + resultados) --------
-            competition = settings.fd_competition or "PL"
-            fd_season = season if season is not None else settings.season
-            for match in fd.get_matches(competition, season=fd_season):
-                if _store_fd_match(conn, match):
-                    counts["fixtures"] += 1
+            # FD_COMPETITION admite varias competiciones separadas por coma, con
+            # temporada opcional por competición: "WC:2026,EC:2024".
+            default_season = season if season is not None else settings.season
+            comps = _parse_competitions(settings.fd_competition or "PL", default_season)
+            for comp, comp_season in comps:
+                for match in fd.get_matches(comp, season=comp_season):
+                    if _store_fd_match(conn, match):
+                        counts["fixtures"] += 1
             # Cuotas: The Odds API (no las da football-data.org).
             if use_oddsapi:
                 _ingest_odds_api(conn, odds, counts)
@@ -106,6 +109,23 @@ def ingest(target_date: str | None = None, league: int | None = None,
 
     counts["mode"] = 1
     return counts
+
+
+def _parse_competitions(spec: str, default_season: int | None) -> list[tuple[str, int | None]]:
+    """Parsea 'WC:2026,EC:2024' -> [('WC',2026),('EC',2024)].
+    Acepta también códigos sueltos ('WC,PL') usando la temporada por defecto."""
+    out: list[tuple[str, int | None]] = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            code, _, s = part.partition(":")
+            s = s.strip()
+            out.append((code.strip(), int(s) if s.isdigit() else default_season))
+        else:
+            out.append((part, default_season))
+    return out
 
 
 def _ingest_odds_api(conn, odds: OddsAPIClient, counts: dict) -> None:

@@ -11,3 +11,6 @@ database/betlab.db
 data/*.csv
 data/*.json
 reports/reporte_diario.html
+
+# Streamlit secrets locales
+.streamlit/secrets.toml

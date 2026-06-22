@@ -16,6 +16,7 @@ Ejecución:  streamlit run dashboard/app.py
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -25,6 +26,16 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd  # noqa: E402
 import plotly.express as px  # noqa: E402
 import streamlit as st  # noqa: E402
+
+# --- Puente de secretos (despliegue web) -----------------------------------
+# En Streamlit Community Cloud las claves se cargan en "Secrets". Las copiamos
+# a variables de entorno ANTES de importar config (que las lee al iniciar).
+try:
+    for _k, _v in st.secrets.items():
+        if isinstance(_v, (str, int, float)):
+            os.environ.setdefault(_k, str(_v))
+except Exception:
+    pass
 
 from config import settings  # noqa: E402
 from database import init_db, query_df  # noqa: E402

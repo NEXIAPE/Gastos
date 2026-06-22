@@ -64,6 +64,58 @@ FACTOR_LABELS = {
 }
 MODE_COLOR = {"NORMAL": "🟢", "REDUCED": "🟡", "CONSERVATION": "🔴"}
 
+
+def _inject_css() -> None:
+    """Estilos personalizados para un look más moderno."""
+    st.markdown("""
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+      html, body, [class*="css"], .stApp { font-family: 'Inter', sans-serif; }
+      .block-container { padding-top: 1.2rem; max-width: 1150px; }
+
+      /* Header hero */
+      .hero { background: linear-gradient(135deg,#16a34a 0%,#0ea5e9 100%);
+              padding: 20px 24px; border-radius: 18px; margin-bottom: 18px;
+              box-shadow: 0 8px 30px rgba(14,165,233,.18); }
+      .hero h1 { color:#fff; margin:0; font-weight:800; font-size:1.7rem;
+                 letter-spacing:.3px; }
+      .hero p  { color:#eafff4; margin:.25rem 0 0; font-size:.95rem; }
+
+      /* Métricas tipo tarjeta */
+      [data-testid="stMetric"] { background:#16213a; border:1px solid #24314f;
+              border-radius:14px; padding:14px 16px; }
+      [data-testid="stMetricValue"] { font-weight:800; }
+
+      /* Tarjetas con borde (st.container border) */
+      [data-testid="stVerticalBlockBorderWrapper"] { border-radius:14px; }
+
+      /* Botones */
+      .stButton>button { border-radius:10px; font-weight:700; border:0;
+              transition:transform .05s ease; }
+      .stButton>button:hover { transform: translateY(-1px); }
+      .stButton>button[kind="primary"] { background:#22c55e; color:#04210f; }
+
+      /* Pestañas */
+      .stTabs [data-baseweb="tab-list"] { gap:8px; }
+      .stTabs [data-baseweb="tab"] { border-radius:12px; padding:6px 14px;
+              background:#101a30; }
+      .stTabs [aria-selected="true"] { background:#16a34a !important; color:#fff !important; }
+
+      /* Inputs */
+      [data-baseweb="input"] input, [data-baseweb="select"] { border-radius:10px; }
+
+      /* Ocultar chrome de Streamlit */
+      footer {visibility:hidden;} #MainMenu {visibility:hidden;}
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def _hero() -> None:
+    st.markdown(
+        '<div class="hero"><h1>⚽ BETLAB&nbsp;AI</h1>'
+        '<p>Tus mejores apuestas del día, elegidas por valor matemático.</p></div>',
+        unsafe_allow_html=True)
+
 # Liga/competición -> (código football-data.org, sport key de The Odds API).
 LEAGUES = {
     "🌍 Mundial 2026 (historial completo)": ("INTL", "soccer_fifa_world_cup"),
@@ -135,12 +187,12 @@ def _check_login() -> bool:
 
 
 def main() -> None:
+    _inject_css()
     if not _check_login():
         return
     init_db()
     _ensure_data()
-    st.markdown("## ⚽ BETLAB&nbsp;AI")
-    st.caption("Tus mejores apuestas del día, elegidas por valor matemático.")
+    _hero()
 
     state = get_state()
     rep = load_strategies()
@@ -400,24 +452,27 @@ def _tab_strategy(rep, state) -> None:
         b = rep.premium
         desc = f"{b.match} · {describe_pick(b.match, b.market, b.selection)}"
         st.markdown("### 🏅 Pick Premium del día")
-        c = st.columns([4, 1.4])
-        c[0].success(f"**{b.match}**  \n"
-                     f"👉 **Apostá a: {describe_pick(b.match, b.market, b.selection)}**  \n"
-                     f"Cuota **{b.odd}** · EV **+{b.ev:.1%}** · Confianza **{b.confidence:.0f}** [{b.tier}]")
-        with c[1]:
-            _bet_controls(desc, b.odd, "premium")
+        with st.container(border=True):
+            c = st.columns([4, 1.4])
+            c[0].markdown(
+                f"#### {b.match}\n"
+                f"👉 **{describe_pick(b.match, b.market, b.selection)}**  \n"
+                f"🎯 Cuota **{b.odd}**  ·  📈 EV **+{b.ev:.1%}**  ·  "
+                f"🔵 Confianza **{b.confidence:.0f}** · {b.tier}")
+            with c[1]:
+                _bet_controls(desc, b.odd, "premium")
 
     # B) Top 5
     st.markdown("### 📋 Top 5 Value Bets")
     if rep.top5:
         for i, b in enumerate(rep.top5):
             desc = f"{b.match} · {describe_pick(b.match, b.market, b.selection)}"
-            c = st.columns([4, 1.4, 1.4])
-            c[0].markdown(f"**{b.match}**  \n👉 {describe_pick(b.match, b.market, b.selection)}")
-            c[1].markdown(f"Cuota **{b.odd}**  \nEV +{b.ev:.1%} · conf {b.confidence:.0f}")
-            with c[2]:
-                _bet_controls(desc, b.odd, f"t{i}")
-            st.divider()
+            with st.container(border=True):
+                c = st.columns([4, 1.4, 1.4])
+                c[0].markdown(f"**{b.match}**  \n👉 {describe_pick(b.match, b.market, b.selection)}")
+                c[1].markdown(f"Cuota **{b.odd}**  \nEV +{b.ev:.1%} · conf {b.confidence:.0f}")
+                with c[2]:
+                    _bet_controls(desc, b.odd, f"t{i}")
     else:
         st.info("No hay value bets elegibles hoy.")
 
@@ -433,13 +488,14 @@ def _tab_strategy(rep, state) -> None:
         cols = st.columns(len(rep.parlays))
         for col, p in zip(cols, rep.parlays):
             with col:
-                st.markdown(f"**{names.get(p.name, p.name)}**")
-                for leg in p.legs:
-                    st.caption(f"• {describe_pick(leg.match, leg.market, leg.selection)} "
-                               f"@ {leg.odd}")
-                st.metric("Cuota total", f"{p.total_odd:.2f}", f"EV +{p.ev:.0%} · {p.risk}")
-                legs = " + ".join(describe_pick(l.match, l.market, l.selection) for l in p.legs)
-                _bet_controls(f"Combinada {p.name}: {legs}", p.total_odd, f"combo_{p.name}")
+                with st.container(border=True):
+                    st.markdown(f"**{names.get(p.name, p.name)}**")
+                    for leg in p.legs:
+                        st.caption(f"• {describe_pick(leg.match, leg.market, leg.selection)} "
+                                   f"@ {leg.odd}")
+                    st.metric("Cuota total", f"{p.total_odd:.2f}", f"EV +{p.ev:.0%} · {p.risk}")
+                    legs = " + ".join(describe_pick(l.match, l.market, l.selection) for l in p.legs)
+                    _bet_controls(f"Combinada {p.name}: {legs}", p.total_odd, f"combo_{p.name}")
 
 
 def _tab_performance() -> None:

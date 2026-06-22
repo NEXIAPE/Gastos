@@ -52,6 +52,23 @@ FACTOR_LABELS = {
 }
 MODE_COLOR = {"NORMAL": "🟢", "REDUCED": "🟡", "CONSERVATION": "🔴"}
 
+# Liga/competición -> (código football-data.org, sport key de The Odds API).
+LEAGUES = {
+    "🌍 Mundial (selecciones)": ("WC", "soccer_fifa_world_cup"),
+    "🇪🇺 Eurocopa (selecciones)": ("EC", "soccer_uefa_european_championship"),
+    "🏴 Premier League (Inglaterra)": ("PL", "soccer_epl"),
+    "🇪🇸 La Liga (España)": ("PD", "soccer_spain_la_liga"),
+    "🇮🇹 Serie A (Italia)": ("SA", "soccer_italy_serie_a"),
+    "🇩🇪 Bundesliga (Alemania)": ("BL1", "soccer_germany_bundesliga"),
+    "🇫🇷 Ligue 1 (Francia)": ("FL1", "soccer_france_ligue_one"),
+    "🇳🇱 Eredivisie (Países Bajos)": ("DED", "soccer_netherlands_eredivisie"),
+    "🇵🇹 Primeira Liga (Portugal)": ("PPL", "soccer_portugal_primeira_liga"),
+    "🏴 Championship (Inglaterra 2ª)": ("ELC", "soccer_efl_champ"),
+    "🇧🇷 Brasileirão (Brasil)": ("BSA", "soccer_brazil_campeonato"),
+    "🏆 Champions League": ("CL", "soccer_uefa_champs_league"),
+    "🥇 Copa Libertadores": ("CLI", "soccer_conmebol_copa_libertadores"),
+}
+
 
 def _ensure_data() -> None:
     """En la primera carga (DB vacía) siembra datos demo automáticamente.
@@ -92,10 +109,25 @@ def main() -> None:
         st.caption(f"stake ×{state.stake_multiplier} · conf. mín. {state.min_confidence:.0f} · "
                    f"combinadas {'sí' if state.allow_parlays else 'NO'}")
         st.divider()
-        if st.button("🔄 Actualizar datos"):
-            with st.spinner("Ingesta..."):
-                ingest()
-            load_strategies.clear(); st.rerun()
+        st.subheader("📥 Datos")
+        league_name = st.selectbox("Liga / competición", list(LEAGUES), index=0)
+        season = st.number_input("Temporada", min_value=2020, max_value=2030,
+                                 value=2026, step=1,
+                                 help="Año de inicio de la temporada. Podés actualizar "
+                                      "varias temporadas: los partidos se acumulan.")
+        if st.button("🔄 Actualizar datos", use_container_width=True):
+            code, odds_key = LEAGUES[league_name]
+            with st.spinner(f"Descargando {league_name} ({int(season)})..."):
+                summary = ingest(competition=code, season=int(season), odds_sport=odds_key)
+            load_strategies.clear()
+            if summary.get("demo"):
+                st.warning("Sin claves de API: se usaron datos demo. "
+                           "Configura FOOTBALLDATA_TOKEN/ODDS_API_KEY en .env.")
+            else:
+                st.success(f"✔ {summary.get('fixtures',0)} partidos · "
+                           f"{summary.get('odds',0)} cuotas")
+            st.rerun()
+        st.divider()
         if st.button("🧮 Recalcular picks"):
             load_strategies.clear(); st.rerun()
         if st.button("✅ Liquidar resultados"):

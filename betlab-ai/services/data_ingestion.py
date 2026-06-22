@@ -27,7 +27,8 @@ from services.odds_api import OddsAPIClient, normalize_event_odds
 
 
 def ingest(target_date: str | None = None, league: int | None = None,
-           season: int | None = None) -> dict[str, int]:
+           season: int | None = None, competition: str | None = None,
+           odds_sport: str | None = None) -> dict[str, int]:
     """
     Ejecuta la ingesta completa para una fecha (YYYY-MM-DD).
 
@@ -60,14 +61,15 @@ def ingest(target_date: str | None = None, league: int | None = None,
             # FD_COMPETITION admite varias competiciones separadas por coma, con
             # temporada opcional por competición: "WC:2026,EC:2024".
             default_season = season if season is not None else settings.season
-            comps = _parse_competitions(settings.fd_competition or "PL", default_season)
+            spec = competition or settings.fd_competition or "PL"
+            comps = _parse_competitions(spec, default_season)
             for comp, comp_season in comps:
                 for match in fd.get_matches(comp, season=comp_season):
                     if _store_fd_match(conn, match):
                         counts["fixtures"] += 1
             # Cuotas: The Odds API (no las da football-data.org).
             if use_oddsapi:
-                _ingest_odds_api(conn, odds, counts)
+                _ingest_odds_api(conn, odds, counts, odds_sport=odds_sport)
         else:
             # --- Fuente: API-Football (fixtures + stats + lesiones) -------
             fixtures = football.get_fixtures_by_date(target_date, league, season)
@@ -105,7 +107,7 @@ def ingest(target_date: str | None = None, league: int | None = None,
 
             # Cuotas vía The Odds API (emparejadas por nombre de equipo).
             if use_oddsapi:
-                _ingest_odds_api(conn, odds, counts)
+                _ingest_odds_api(conn, odds, counts, odds_sport=odds_sport)
 
     counts["mode"] = 1
     return counts
@@ -128,10 +130,11 @@ def _parse_competitions(spec: str, default_season: int | None) -> list[tuple[str
     return out
 
 
-def _ingest_odds_api(conn, odds: OddsAPIClient, counts: dict) -> None:
+def _ingest_odds_api(conn, odds: OddsAPIClient, counts: dict,
+                     odds_sport: str | None = None) -> None:
     """Descarga cuotas de The Odds API y las empareja con los fixtures por nombre."""
     events = odds.get_odds(
-        sport=settings.odds_sport,
+        sport=odds_sport or settings.odds_sport,
         regions=settings.odds_regions,
         markets="h2h,totals,spreads",
     )

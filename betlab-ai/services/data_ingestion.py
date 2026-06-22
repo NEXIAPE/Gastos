@@ -88,7 +88,11 @@ def ingest(target_date: str | None = None, league: int | None = None,
 
         # --- Module 2b: cuotas vía The Odds API ---------------------------
         if use_oddsapi:
-            events = odds.get_odds(markets="h2h,totals,spreads")
+            events = odds.get_odds(
+                sport=settings.odds_sport,
+                regions=settings.odds_regions,
+                markets="h2h,totals,spreads",
+            )
             fixtures_by_teams = _index_fixtures(conn)
             for event in events:
                 fixture_id = _match_event_to_fixture(event, fixtures_by_teams)

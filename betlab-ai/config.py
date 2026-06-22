@@ -50,6 +50,10 @@ class Settings:
         default_factory=lambda: os.getenv("API_FOOTBALL_HOST", "v3.football.api-sports.io")
     )
     odds_api_key: str = field(default_factory=lambda: os.getenv("ODDS_API_KEY", ""))
+    # Clave de competición de The Odds API (p.ej. soccer_fifa_world_cup,
+    # soccer_epl, soccer_spain_la_liga, upcoming). Solo aplica a esa fuente.
+    odds_sport: str = field(default_factory=lambda: os.getenv("ODDS_SPORT", "upcoming"))
+    odds_regions: str = field(default_factory=lambda: os.getenv("ODDS_REGIONS", "eu"))
 
     # --- Value Bet Engine ---------------------------------------------------
     # EV mínimo para considerar una apuesta de valor (5% -> 0.05).

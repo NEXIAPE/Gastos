@@ -94,7 +94,22 @@ def _parlay_risk(joint_prob: float, n_legs: int) -> str:
 
 def _to_leg(b: ValueBet) -> Leg:
     return Leg(match=b.match, market=b.market, selection=b.selection,
-              odd=b.odd, model_prob=b.model_prob, ev=b.ev, confidence=b.confidence)
+               odd=b.odd, model_prob=b.model_prob, ev=b.ev, confidence=b.confidence)
+
+
+def fmt_market(market: str) -> str:
+    """Etiqueta legible del mercado: O/U 1.5, Hándicap -1.5, 1X2, BTTS."""
+    if market.startswith("OU_"):
+        return f"O/U {market[3:]}"
+    if market.startswith("AH_"):
+        return f"Hándicap {market[3:]}"
+    return market
+
+
+def fmt_selection(selection: str) -> str:
+    """Etiqueta legible de la selección."""
+    return {"HOME": "Local", "DRAW": "Empate", "AWAY": "Visitante",
+            "OVER": "Over", "UNDER": "Under", "YES": "Sí", "NO": "No"}.get(selection, selection)
 
 
 def _select_legs(max_legs: int, bets: list[ValueBet]) -> list[ValueBet]:

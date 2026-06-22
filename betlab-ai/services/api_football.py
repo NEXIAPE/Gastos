@@ -138,11 +138,14 @@ def _map_apifootball_value(bet_name: str, value: str) -> tuple[str | None, str]:
             return "AWAY", "1X2"
         return None, "1X2"
 
-    if bet_name == "goals over/under":       # Over/Under (solo línea 2.5)
-        if v == "over 2.5":
-            return "OVER", "OU_2.5"
-        if v == "under 2.5":
-            return "UNDER", "OU_2.5"
+    if bet_name == "goals over/under":       # Over/Under en cualquier línea
+        parts = v.split()                    # p.ej. "over 2.5" / "under 1.5"
+        if len(parts) == 2 and parts[1].replace(".", "", 1).isdigit():
+            side, line = parts[0], parts[1]
+            if side == "over":
+                return "OVER", f"OU_{line}"
+            if side == "under":
+                return "UNDER", f"OU_{line}"
         return None, "OU_2.5"
 
     if bet_name == "both teams score":       # BTTS

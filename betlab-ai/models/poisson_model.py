@@ -77,6 +77,13 @@ class PoissonModel:
         none = self._matrix[0, 0]               # 0-0 (contado dos veces)
         return float(1.0 - (no_home + no_away - none))
 
+    def prob_handicap(self, side: str, line: float) -> float:
+        """P(el equipo 'side' cubre el hándicap 'line'), p.ej. +1.5 o -0.5.
+        Exacto en líneas .5 (sin push). 'side' = 'HOME' o 'AWAY'."""
+        i, j = np.indices(self._matrix.shape)
+        margin = (i - j) if side.upper() == "HOME" else (j - i)
+        return float(self._matrix[margin + line > 0].sum())
+
     def prob_exact_score(self, home_goals: int, away_goals: int) -> float:
         if home_goals > self.max_goals or away_goals > self.max_goals:
             return 0.0

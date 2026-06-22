@@ -69,8 +69,9 @@ def cmd_value(_args) -> None:
     bets = detect_value_bets()
     print(f"✔ {len(bets)} picks (EV > {settings.min_ev:.0%} y confianza > "
           f"{settings.min_confidence:.0f}).")
+    from models.strategies import fmt_market, fmt_selection
     for b in bets[:10]:
-        print(f"  · {b.match:<30} {b.market:<7} {b.selection:<5} "
+        print(f"  · {b.match:<30} {fmt_market(b.market):<14} {fmt_selection(b.selection):<8} "
               f"cuota={b.odd:<5} EV=+{b.ev:.1%} conf={b.confidence:>4.0f} "
               f"[{b.tier}] stake={b.stake_amount:.2f}€")
 
@@ -159,14 +160,13 @@ def _print_strategies(refresh: bool = False) -> None:
     if refresh:
         _refresh_context()
     rep = build_strategies()
-    sl = {"HOME": "Local", "DRAW": "Empate", "AWAY": "Visitante", "OVER": "Over",
-          "UNDER": "Under", "YES": "BTTS Sí", "NO": "BTTS No"}
+    from models.strategies import fmt_market, fmt_selection
 
     print(f"\n=== ESTRATEGIA DIARIA (modo bankroll: {rep.bankroll_mode}) ===")
     if rep.premium:
         b = rep.premium
         print(f"\nA) PICK PREMIUM DEL DÍA  ·  {b.match}")
-        print(f"   {b.market} {sl.get(b.selection, b.selection)} | cuota {b.odd} | "
+        print(f"   {fmt_market(b.market)} {fmt_selection(b.selection)} | cuota {b.odd} | "
               f"prob {b.model_prob:.0%} | EV +{b.ev:.1%} | conf {b.confidence:.0f} "
               f"[{b.tier}] | stake {b.stake_amount:.2f}€")
     else:
@@ -176,7 +176,7 @@ def _print_strategies(refresh: bool = False) -> None:
     if not rep.top5:
         print("   (vacío)")
     for i, b in enumerate(rep.top5, 1):
-        print(f"   {i}. {b.match:<26} {b.market:<6} {sl.get(b.selection, b.selection):<10} "
+        print(f"   {i}. {b.match:<26} {fmt_market(b.market):<13} {fmt_selection(b.selection):<8} "
               f"cuota {b.odd:<5} EV +{b.ev:.1%} conf {b.confidence:.0f} "
               f"stake {b.stake_amount:.2f}€")
 
@@ -191,8 +191,8 @@ def _print_strategies(refresh: bool = False) -> None:
         for p in rep.parlays:
             print(f"\n{labels.get(p.name, p.name)}")
             for leg in p.legs:
-                print(f"   - {leg.match:<26} {leg.market:<6} "
-                      f"{sl.get(leg.selection, leg.selection):<10} @ {leg.odd}")
+                print(f"   - {leg.match:<26} {fmt_market(leg.market):<13} "
+                      f"{fmt_selection(leg.selection):<8} @ {leg.odd}")
             print(f"   Cuota total: {p.total_odd} | Prob. conjunta: {p.joint_prob:.1%} "
                   f"| EV: +{p.ev:.1%} | Riesgo: {p.risk}")
 

@@ -107,7 +107,15 @@ def _model_prob(model: PoissonModel, market: str, selection: str) -> float | Non
     if market == "BTTS":
         p = model.prob_btts()
         return p if selection == "YES" else (1 - p if selection == "NO" else None)
-    return None  # Asian Handicap no modelado analíticamente aquí
+    if market.startswith("AH_"):           # Hándicap asiático (p.ej. +1.5, -0.5)
+        try:
+            line = float(market.split("_", 1)[1])
+        except ValueError:
+            return None
+        if selection in ("HOME", "AWAY"):
+            return model.prob_handicap(selection, line)
+        return None
+    return None
 
 
 def detect_value_bets(min_ev: float | None = None,

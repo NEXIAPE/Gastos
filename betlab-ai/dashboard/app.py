@@ -36,7 +36,7 @@ from models.performance import (  # noqa: E402
     profit_by_league, profit_by_market,
 )
 from models.roi import settle_by_results  # noqa: E402
-from models.strategies import build_strategies  # noqa: E402
+from models.strategies import build_strategies, fmt_market, fmt_selection  # noqa: E402
 from services.data_ingestion import ingest  # noqa: E402
 
 st.set_page_config(page_title="BETLAB AI", page_icon="⚽", layout="wide")
@@ -176,7 +176,7 @@ def _tab_strategy(rep, state) -> None:
     if rep.premium:
         b = rep.premium
         st.markdown(f"### 🏅 A) Pick Premium del día")
-        st.success(f"**{b.match}** · {MKT.get(b.market, b.market)} **{SEL.get(b.selection, b.selection)}**  \n"
+        st.success(f"**{b.match}** · {fmt_market(b.market)} **{fmt_selection(b.selection)}**  \n"
                    f"Cuota **{b.odd}** · Prob **{b.model_prob:.0%}** · EV **+{b.ev:.1%}** · "
                    f"Confianza **{b.confidence:.0f}** [{b.tier}] · Stake **{b.stake_amount:.2f}€** · Riesgo {b.risk}")
     else:
@@ -186,8 +186,8 @@ def _tab_strategy(rep, state) -> None:
     st.markdown("### 📋 B) Top 5 Value Bets")
     if rep.top5:
         df = pd.DataFrame([{
-            "Partido": b.match, "Mercado": MKT.get(b.market, b.market),
-            "Selección": SEL.get(b.selection, b.selection), "Cuota": b.odd,
+            "Partido": b.match, "Mercado": fmt_market(b.market),
+            "Selección": fmt_selection(b.selection), "Cuota": b.odd,
             "Prob": f"{b.model_prob:.0%}", "EV": f"+{b.ev:.1%}",
             "Confianza": int(b.confidence), "Tier": b.tier,
             "Stake": f"{b.stake_amount:.2f}€", "Riesgo": b.risk,
@@ -210,8 +210,8 @@ def _tab_strategy(rep, state) -> None:
             with col:
                 st.markdown(f"**{names.get(p.name, p.name)}**")
                 for leg in p.legs:
-                    st.caption(f"• {leg.match} · {MKT.get(leg.market, leg.market)} "
-                               f"{SEL.get(leg.selection, leg.selection)} @ {leg.odd}")
+                    st.caption(f"• {leg.match} · {fmt_market(leg.market)} "
+                               f"{fmt_selection(leg.selection)} @ {leg.odd}")
                 st.metric("Cuota total", f"{p.total_odd:.2f}",
                           f"EV +{p.ev:.0%} · {p.risk}")
                 st.caption(f"Prob. conjunta {p.joint_prob:.1%}")
@@ -307,7 +307,7 @@ def _tab_factors(rep) -> None:
     if not bets:
         st.info("Sin picks para desglosar.")
         return
-    labels = [f"{b.match} · {SEL.get(b.selection, b.selection)} "
+    labels = [f"{b.match} · {fmt_selection(b.selection)} "
               f"({b.confidence:.0f} · {b.tier})" for b in bets]
     idx = st.selectbox("Pick", range(len(labels)), format_func=lambda i: labels[i])
     fb = bets[idx].factors

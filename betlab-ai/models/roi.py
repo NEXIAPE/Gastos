@@ -41,8 +41,20 @@ def log_value_bets() -> int:
     return inserted
 
 
+def _store():
+    """Devuelve el módulo Supabase si está activo; si no, None (usa SQLite)."""
+    try:
+        from services import supabase_store as sb
+        return sb if sb.enabled() else None
+    except Exception:
+        return None
+
+
 def get_deposit(user: str = "default") -> float:
     """Capital inicial (depósito) del usuario para su traza."""
+    sb = _store()
+    if sb:
+        return sb.get_deposit(user)
     df = query_df("SELECT value FROM app_settings WHERE key = ?", [f"deposit:{user}"])
     if df.empty:
         return 0.0
@@ -53,6 +65,10 @@ def get_deposit(user: str = "default") -> float:
 
 
 def set_deposit(amount: float, user: str = "default") -> None:
+    sb = _store()
+    if sb:
+        sb.set_deposit(user, amount)
+        return
     with session() as conn:
         conn.execute(
             "INSERT INTO app_settings (key, value) VALUES (?, ?) "
@@ -64,6 +80,9 @@ def log_manual_bet(description: str, odd: float, stake: float,
                    market: str = "MANUAL", selection: str = "-",
                    user: str = "default") -> int:
     """Registra una apuesta cargada a mano por el usuario (queda PENDING)."""
+    sb = _store()
+    if sb:
+        return sb.add_bet(user, description, float(odd), float(stake)) or 0
     with session() as conn:
         # Garantiza el partido "sentinela" (id 0) por si fue borrado en un reseed.
         conn.execute("INSERT OR IGNORE INTO teams (id, name) VALUES (0, 'Manual')")
@@ -80,6 +99,10 @@ def log_manual_bet(description: str, odd: float, stake: float,
 
 def manual_bets(user: str = "default") -> "pd.DataFrame":
     """Apuestas manuales del usuario (su traza), más recientes primero."""
+    cols = ["id", "note", "odd", "stake_amount", "status", "profit", "placed_at", "settled_at"]
+    sb = _store()
+    if sb:
+        return pd.DataFrame(sb.list_bets(user), columns=cols)
     return query_df(
         "SELECT id, note, odd, stake_amount, status, profit, placed_at, settled_at "
         "FROM bet_log WHERE manual = 1 AND user = ? ORDER BY id DESC", [user]
@@ -88,10 +111,15 @@ def manual_bets(user: str = "default") -> "pd.DataFrame":
 
 def manual_ledger(start: float = 0.0, user: str = "default") -> dict[str, float]:
     """Resumen de la traza manual del usuario: balance, pendiente, ROI."""
-    df = query_df(
-        "SELECT status, stake_amount, profit FROM bet_log WHERE manual = 1 AND user = ?",
-        [user]
-    )
+    sb = _store()
+    if sb:
+        df = pd.DataFrame(sb.list_bets(user),
+                          columns=["id", "note", "odd", "stake_amount",
+                                   "status", "profit", "placed_at", "settled_at"])
+    else:
+        df = query_df(
+            "SELECT status, stake_amount, profit FROM bet_log "
+            "WHERE manual = 1 AND user = ?", [user])
     if df.empty:
         return {"balance": round(start, 2), "pending_stake": 0.0, "staked": 0.0,
                 "profit": 0.0, "roi": 0.0, "won": 0, "lost": 0, "pending": 0}
@@ -113,6 +141,10 @@ def manual_ledger(start: float = 0.0, user: str = "default") -> dict[str, float]
 
 def delete_bet(bet_id: int) -> None:
     """Elimina una apuesta del registro."""
+    sb = _store()
+    if sb:
+        sb.delete_bet(bet_id)
+        return
     with session() as conn:
         conn.execute("DELETE FROM bet_log WHERE id = ?", (bet_id,))
 
@@ -121,6 +153,11 @@ def update_bet(bet_id: int, odd: float | None = None, stake: float | None = None
                note: str | None = None) -> None:
     """Edita cuota/stake/descripción de una apuesta y recalcula su ganancia
     si ya estaba resuelta."""
+    sb = _store()
+    if sb:
+        sb.update_bet(bet_id, odd if odd is not None else 0,
+                      stake if stake is not None else 0, note)
+        return
     with session() as conn:
         row = conn.execute(
             "SELECT odd, stake_amount, status FROM bet_log WHERE id = ?", (bet_id,)
@@ -148,6 +185,10 @@ def update_bet(bet_id: int, odd: float | None = None, stake: float | None = None
 def set_bet_status(bet_id: int, status: str) -> None:
     """Cambia el estado de una apuesta (incluye volver a PENDIENTE)."""
     status = status.upper()
+    sb = _store()
+    if sb:
+        sb.set_status(bet_id, status)
+        return
     if status == "PENDING":
         with session() as conn:
             conn.execute(

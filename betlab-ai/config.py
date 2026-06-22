@@ -125,6 +125,9 @@ class Settings:
     bankroll: float = field(default_factory=lambda: _get_float("BANKROLL", 1000.0))
     # Símbolo de moneda para mostrar (S/ soles, €, $, etc.).
     currency: str = field(default_factory=lambda: (os.getenv("CURRENCY", "") or "S/").strip())
+    # Supabase (persistencia permanente de apuestas/depósitos por usuario).
+    supabase_url: str = field(default_factory=lambda: (os.getenv("SUPABASE_URL", "") or "").strip())
+    supabase_key: str = field(default_factory=lambda: _get_secret("SUPABASE_KEY"))
     # Tope máximo de stake como % del bankroll (protección).
     max_stake_pct: float = field(default_factory=lambda: _get_float("MAX_STAKE_PCT", 0.10))
 

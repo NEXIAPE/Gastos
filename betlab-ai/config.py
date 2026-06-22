@@ -50,7 +50,7 @@ class Settings:
     # --- Claves de API ------------------------------------------------------
     api_football_key: str = field(default_factory=lambda: os.getenv("API_FOOTBALL_KEY", ""))
     api_football_host: str = field(
-        default_factory=lambda: os.getenv("API_FOOTBALL_HOST", "v3.football.api-sports.io")
+        default_factory=lambda: os.getenv("API_FOOTBALL_HOST") or "v3.football.api-sports.io"
     )
     odds_api_key: str = field(default_factory=lambda: os.getenv("ODDS_API_KEY", ""))
     # Clave de competición de The Odds API (p.ej. soccer_fifa_world_cup,

@@ -29,17 +29,18 @@ class APIFootballClient:
         self.host = host or settings.api_football_host
         self.session = requests.Session()
         if self.api_key:
-            # El endpoint directo (api-sports.io) usa 'x-apisports-key';
-            # el acceso vía RapidAPI usa 'x-rapidapi-key' + 'x-rapidapi-host'.
-            if "api-sports.io" in self.host:
-                self.session.headers.update({"x-apisports-key": self.api_key})
-            else:
+            # Solo el acceso vía RapidAPI usa 'x-rapidapi-*'. El endpoint
+            # directo (api-sports.io), que es el caso por defecto, usa
+            # 'x-apisports-key'. Ante cualquier duda, se usa el directo.
+            if "rapidapi" in (self.host or "").lower():
                 self.session.headers.update(
                     {
                         "x-rapidapi-key": self.api_key,
                         "x-rapidapi-host": self.host,
                     }
                 )
+            else:
+                self.session.headers.update({"x-apisports-key": self.api_key})
 
     @property
     def enabled(self) -> bool:

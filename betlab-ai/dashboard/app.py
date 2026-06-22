@@ -251,13 +251,14 @@ def main() -> None:
 
 
 def _tab_my_bets(rep) -> None:
-    """Registro personal de apuestas (la traza): cargar, marcar resultado, balance."""
-    from models.roi import (delete_bet, log_manual_bet, manual_bets,
-                            manual_ledger, settle_bet)
+    """Registro personal de apuestas (la traza): cargar, editar, marcar resultado."""
+    from models.roi import (log_manual_bet, manual_bets, manual_ledger,
+                            set_bet_status, update_bet)
 
     st.subheader("🧾 Mis Apuestas")
-    st.caption("Anotá las apuestas que hacés de verdad. Después marcás si ganaron o "
-               "perdieron y el balance se actualiza solo. Empieza en 0.")
+    st.caption("Anotá las apuestas que hacés de verdad. Podés **editar cuota, stake y "
+               "estado** en la tabla (la cuota real de tu casa suele diferir un poco). "
+               "El balance arranca en 0.")
 
     led = manual_ledger(start=0.0)
     k = st.columns(4)
@@ -272,52 +273,84 @@ def _tab_my_bets(rep) -> None:
     st.caption(f"✅ Ganadas: {led['won']}  ·  ❌ Perdidas: {led['lost']}  ·  "
                f"⏳ Pendientes: {led['pending']}")
 
-    # --- Cargar una apuesta nueva ---
+    # --- Registrar una apuesta (single o combinada) ---
     with st.expander("➕ Registrar una apuesta nueva", expanded=False):
-        # Atajo: tomar uno de los picks de hoy
-        pick_opts = {"(escribir a mano)": None}
+        opts: dict[str, tuple] = {"(escribir a mano)": ("none", None)}
         for b in rep.pool[:15]:
-            label = f"{b.match} · {describe_pick(b.match, b.market, b.selection)} (cuota {b.odd})"
-            pick_opts[label] = b
-        choice = st.selectbox("Tomar de los picks de hoy (opcional)", list(pick_opts))
-        base = pick_opts[choice]
+            opts[f"{b.match} · {describe_pick(b.match, b.market, b.selection)} "
+                 f"(cuota {b.odd})"] = ("single", b)
+        for p in rep.parlays:
+            legs = " + ".join(describe_pick(l.match, l.market, l.selection) for l in p.legs)
+            opts[f"🎰 Combinada {p.name} — {legs} (cuota total {p.total_odd:.2f})"] = ("combo", p)
+
+        choice = st.selectbox("Tomar de los picks de hoy (opcional)", list(opts))
+        kind, obj = opts[choice]
+        if kind == "single":
+            pre_desc = f"{obj.match} · {describe_pick(obj.match, obj.market, obj.selection)}"
+            pre_odd = float(obj.odd)
+        elif kind == "combo":
+            legs = " + ".join(describe_pick(l.match, l.market, l.selection) for l in obj.legs)
+            pre_desc = f"Combinada {obj.name}: {legs}"
+            pre_odd = float(obj.total_odd)
+        else:
+            pre_desc, pre_odd = "", 2.00
+
         with st.form("nueva_apuesta", clear_on_submit=True):
-            desc = st.text_input("¿Qué apostaste?",
-                                 value=(f"{base.match} · {describe_pick(base.match, base.market, base.selection)}"
-                                        if base else ""),
+            desc = st.text_input("¿Qué apostaste?", value=pre_desc,
                                  placeholder="Ej: Argentina vs Austria · Gana Argentina")
             c = st.columns(2)
-            odd = c[0].number_input("Cuota", min_value=1.01, value=float(base.odd) if base else 2.00, step=0.01)
-            stake = c[1].number_input(f"Cuánto apostaste ({CUR})", min_value=0.0, value=10.0, step=1.0)
+            odd = c[0].number_input("Cuota (la de TU casa de apuestas)",
+                                    min_value=1.01, value=pre_odd, step=0.01,
+                                    help="Ajustala a la cuota real que te dio la casa.")
+            stake = c[1].number_input(f"Cuánto apostaste ({CUR})", min_value=0.0,
+                                      value=5.0, step=1.0)
             if st.form_submit_button("Guardar apuesta") and desc.strip():
                 log_manual_bet(desc.strip(), odd, stake)
                 st.success("Apuesta registrada como pendiente.")
                 st.rerun()
 
-    # --- Traza: lista de apuestas ---
+    # --- Traza editable ---
     df = manual_bets()
     if df.empty:
         st.info("Todavía no registraste apuestas. Usá «Registrar una apuesta nueva».")
         return
 
-    st.markdown("#### Historial")
-    icon = {"PENDING": "⏳", "WON": "✅", "LOST": "❌", "VOID": "↩️"}
-    for r in df.itertuples():
-        cols = st.columns([5, 2, 2, 3])
-        cols[0].markdown(f"{icon.get(r.status,'')} **{r.note or '-'}**  \n"
-                         f"<small>cuota {r.odd} · apostado {r.stake_amount:.2f}{CUR}"
-                         + (f" · resultado {r.profit:+.2f}{CUR}" if r.status != 'PENDING' else "")
-                         + "</small>", unsafe_allow_html=True)
-        if r.status == "PENDING":
-            if cols[1].button("Ganó ✅", key=f"w{r.id}"):
-                settle_bet(r.id, "WON"); st.rerun()
-            if cols[2].button("Perdió ❌", key=f"l{r.id}"):
-                settle_bet(r.id, "LOST"); st.rerun()
-            if cols[3].button("Anular ↩️", key=f"v{r.id}"):
-                settle_bet(r.id, "VOID"); st.rerun()
-        else:
-            cols[3].button("Borrar 🗑️", key=f"d{r.id}",
-                           on_click=delete_bet, args=(r.id,))
+    st.markdown("#### Historial (editable)")
+    st.caption("Cambiá **Cuota**, **Stake** o **Estado** y apretá «Guardar cambios».")
+    LBL = {"PENDING": "⏳ Pendiente", "WON": "✅ Ganó", "LOST": "❌ Perdió", "VOID": "↩️ Anulada"}
+    INV = {v: k for k, v in LBL.items()}
+
+    view = pd.DataFrame({
+        "id": df["id"],
+        "Apuesta": df["note"].fillna("-"),
+        "Cuota": df["odd"].astype(float),
+        "Stake": df["stake_amount"].astype(float),
+        "Estado": df["status"].map(LBL),
+        "Resultado": df["profit"].astype(float),
+    })
+    edited = st.data_editor(
+        view, hide_index=True, use_container_width=True, key="bet_editor",
+        column_config={
+            "id": None,
+            "Apuesta": st.column_config.TextColumn(width="large"),
+            "Cuota": st.column_config.NumberColumn(min_value=1.01, step=0.01, format="%.2f"),
+            "Stake": st.column_config.NumberColumn(min_value=0.0, step=1.0, format=f"%.2f {CUR}"),
+            "Estado": st.column_config.SelectboxColumn(options=list(LBL.values())),
+            "Resultado": st.column_config.NumberColumn(disabled=True, format=f"%.2f {CUR}"),
+        },
+    )
+    if st.button("💾 Guardar cambios", type="primary"):
+        orig = df.set_index("id")
+        for _, row in edited.iterrows():
+            bid = int(row["id"])
+            o = orig.loc[bid]
+            update_bet(bid, odd=float(row["Cuota"]), stake=float(row["Stake"]),
+                       note=str(row["Apuesta"]))
+            new_status = INV.get(row["Estado"], "PENDING")
+            if new_status != o["status"]:
+                set_bet_status(bid, new_status)
+        st.success("Cambios guardados.")
+        st.rerun()
 
 
 def _tab_strategy(rep, state) -> None:

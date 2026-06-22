@@ -91,6 +91,46 @@ def delete_bet(bet_id: int) -> None:
         conn.execute("DELETE FROM bet_log WHERE id = ?", (bet_id,))
 
 
+def update_bet(bet_id: int, odd: float | None = None, stake: float | None = None,
+               note: str | None = None) -> None:
+    """Edita cuota/stake/descripción de una apuesta y recalcula su ganancia
+    si ya estaba resuelta."""
+    with session() as conn:
+        row = conn.execute(
+            "SELECT odd, stake_amount, status FROM bet_log WHERE id = ?", (bet_id,)
+        ).fetchone()
+        if row is None:
+            return
+        new_odd = float(odd) if odd is not None else row["odd"]
+        new_stake = float(stake) if stake is not None else row["stake_amount"]
+        if row["status"] == "WON":
+            profit = round(new_stake * (new_odd - 1.0), 2)
+        elif row["status"] == "LOST":
+            profit = round(-new_stake, 2)
+        else:
+            profit = 0.0
+        if note is not None:
+            conn.execute(
+                "UPDATE bet_log SET odd=?, stake_amount=?, note=?, profit=? WHERE id=?",
+                (new_odd, new_stake, note, profit, bet_id))
+        else:
+            conn.execute(
+                "UPDATE bet_log SET odd=?, stake_amount=?, profit=? WHERE id=?",
+                (new_odd, new_stake, profit, bet_id))
+
+
+def set_bet_status(bet_id: int, status: str) -> None:
+    """Cambia el estado de una apuesta (incluye volver a PENDIENTE)."""
+    status = status.upper()
+    if status == "PENDING":
+        with session() as conn:
+            conn.execute(
+                "UPDATE bet_log SET status='PENDING', profit=0, settled_at=NULL WHERE id=?",
+                (bet_id,))
+    else:
+        settle_bet(bet_id, status)
+
+
 def settle_bet(bet_id: int, status: str) -> None:
     """Liquida una apuesta. status ∈ {WON, LOST, VOID}."""
     status = status.upper()

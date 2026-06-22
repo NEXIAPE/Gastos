@@ -36,7 +36,7 @@ from models.performance import (  # noqa: E402
     profit_by_league, profit_by_market,
 )
 from models.roi import settle_by_results  # noqa: E402
-from models.strategies import build_strategies, fmt_market, fmt_selection  # noqa: E402
+from models.strategies import build_strategies, describe_pick, fmt_market, fmt_selection  # noqa: E402
 from services.data_ingestion import ingest  # noqa: E402
 
 st.set_page_config(page_title="BETLAB AI", page_icon="⚽", layout="wide")
@@ -139,14 +139,38 @@ def main() -> None:
                 run_backtest()
             st.success("Backtest actualizado")
 
-    # --- KPIs ---------------------------------------------------------------
+    # --- KPIs (con ayuda al pasar el cursor) --------------------------------
     c = st.columns(6)
-    c[0].metric("Picks elegibles", len(rep.pool))
-    c[1].metric("ROI", f"{perf['roi'] * 100:.1f}%")
-    c[2].metric("Yield", f"{perf['yield'] * 100:.1f}%")
-    c[3].metric("Hit rate", f"{perf['hit_rate'] * 100:.0f}%")
-    c[4].metric("Max DD", f"{perf['max_drawdown'] * 100:.0f}%")
-    c[5].metric("Profit", f"{perf['profit']:.0f}€")
+    c[0].metric("Picks elegibles", len(rep.pool),
+                help="Apuestas con valor que el sistema encontró para hoy.")
+    c[1].metric("ROI", f"{perf['roi'] * 100:.1f}%",
+                help="Retorno sobre lo invertido. Positivo = vas ganando.")
+    c[2].metric("Yield", f"{perf['yield'] * 100:.1f}%",
+                help="Ganancia media por apuesta. Por encima de 0% es bueno.")
+    c[3].metric("Hit rate", f"{perf['hit_rate'] * 100:.0f}%",
+                help="% de apuestas acertadas. Ojo: con cuotas altas se puede "
+                     "ganar plata aun acertando menos de la mitad.")
+    c[4].metric("Max DD", f"{perf['max_drawdown'] * 100:.0f}%",
+                help="Máxima caída del bankroll desde un pico (drawdown). "
+                     "Cuanto más bajo, mejor.")
+    c[5].metric("Profit", f"{perf['profit']:.0f}€",
+                help="Ganancia/pérdida total acumulada.")
+
+    with st.expander("ℹ️ ¿Cómo leo todo esto? (guía para no expertos)"):
+        st.markdown(
+            "- **Qué apostar:** cada pick te dice en palabras la jugada exacta a "
+            "marcar en tu casa de apuestas (ej. *Gana Argentina*).\n"
+            "- **Cuota:** lo que paga la casa. Cuota 2.00 = si ganás, cobrás el doble.\n"
+            "- **Prob:** probabilidad que el modelo le da a que ocurra.\n"
+            "- **EV (valor esperado):** el corazón del sistema. Positivo = apuesta "
+            "con ventaja matemática a largo plazo. Cuanto más alto, mejor (pero un "
+            "EV altísimo, +100%, es sospechoso).\n"
+            "- **Confianza (0-100):** qué tan seguro está el modelo. 80+ = pick fuerte.\n"
+            "- **Stake:** cuánto apostar, ya calculado para cuidar tu dinero "
+            "(nunca arriesga de más).\n"
+            "- **1X2:** quién gana (o empate). **O/U:** total de goles. "
+            "**BTTS:** si ambos marcan. **Hándicap:** ventaja/desventaja de goles."
+        )
 
     tabs = st.tabs(["🎯 Estrategia", "📈 Performance", "🏆 Ligas",
                     "🧪 Backtest", "🚫 No Bet", "🧬 Factores"])
@@ -176,9 +200,12 @@ def _tab_strategy(rep, state) -> None:
     if rep.premium:
         b = rep.premium
         st.markdown(f"### 🏅 A) Pick Premium del día")
-        st.success(f"**{b.match}** · {fmt_market(b.market)} **{fmt_selection(b.selection)}**  \n"
+        st.success(f"**{b.match}**  \n"
+                   f"👉 **Apostá a: {describe_pick(b.match, b.market, b.selection)}**  \n"
                    f"Cuota **{b.odd}** · Prob **{b.model_prob:.0%}** · EV **+{b.ev:.1%}** · "
                    f"Confianza **{b.confidence:.0f}** [{b.tier}] · Stake **{b.stake_amount:.2f}€** · Riesgo {b.risk}")
+        st.caption(f"Apostá {b.stake_amount:.2f}€ a «{describe_pick(b.match, b.market, b.selection)}» "
+                   f"en tu casa de apuestas. Si acierta, cobrás {b.stake_amount * b.odd:.2f}€.")
     else:
         st.info("A) Pick Premium: no hay pick elegible hoy.")
 
@@ -186,13 +213,15 @@ def _tab_strategy(rep, state) -> None:
     st.markdown("### 📋 B) Top 5 Value Bets")
     if rep.top5:
         df = pd.DataFrame([{
-            "Partido": b.match, "Mercado": fmt_market(b.market),
-            "Selección": fmt_selection(b.selection), "Cuota": b.odd,
-            "Prob": f"{b.model_prob:.0%}", "EV": f"+{b.ev:.1%}",
+            "Partido": b.match,
+            "Qué apostar": describe_pick(b.match, b.market, b.selection),
+            "Cuota": b.odd, "Prob": f"{b.model_prob:.0%}", "EV": f"+{b.ev:.1%}",
             "Confianza": int(b.confidence), "Tier": b.tier,
             "Stake": f"{b.stake_amount:.2f}€", "Riesgo": b.risk,
         } for b in rep.top5])
         st.dataframe(df, use_container_width=True, hide_index=True)
+        st.caption("**«Qué apostar»** es exactamente lo que marcás en la casa de apuestas. "
+                   "**Stake** = cuánto poner en cada una.")
     else:
         st.info("No hay value bets elegibles hoy.")
 
@@ -210,8 +239,8 @@ def _tab_strategy(rep, state) -> None:
             with col:
                 st.markdown(f"**{names.get(p.name, p.name)}**")
                 for leg in p.legs:
-                    st.caption(f"• {leg.match} · {fmt_market(leg.market)} "
-                               f"{fmt_selection(leg.selection)} @ {leg.odd}")
+                    st.caption(f"• {leg.match}  \n  → {describe_pick(leg.match, leg.market, leg.selection)} "
+                               f"@ {leg.odd}")
                 st.metric("Cuota total", f"{p.total_odd:.2f}",
                           f"EV +{p.ev:.0%} · {p.risk}")
                 st.caption(f"Prob. conjunta {p.joint_prob:.1%}")

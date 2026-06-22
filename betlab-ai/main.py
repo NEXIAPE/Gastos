@@ -160,14 +160,14 @@ def _print_strategies(refresh: bool = False) -> None:
     if refresh:
         _refresh_context()
     rep = build_strategies()
-    from models.strategies import fmt_market, fmt_selection
+    from models.strategies import describe_pick
 
     print(f"\n=== ESTRATEGIA DIARIA (modo bankroll: {rep.bankroll_mode}) ===")
     if rep.premium:
         b = rep.premium
         print(f"\nA) PICK PREMIUM DEL DÍA  ·  {b.match}")
-        print(f"   {fmt_market(b.market)} {fmt_selection(b.selection)} | cuota {b.odd} | "
-              f"prob {b.model_prob:.0%} | EV +{b.ev:.1%} | conf {b.confidence:.0f} "
+        print(f"   👉 Apostá a: {describe_pick(b.match, b.market, b.selection)}")
+        print(f"   cuota {b.odd} | prob {b.model_prob:.0%} | EV +{b.ev:.1%} | conf {b.confidence:.0f} "
               f"[{b.tier}] | stake {b.stake_amount:.2f}€")
     else:
         print("\nA) PICK PREMIUM DEL DÍA: no hay pick elegible hoy.")
@@ -176,8 +176,8 @@ def _print_strategies(refresh: bool = False) -> None:
     if not rep.top5:
         print("   (vacío)")
     for i, b in enumerate(rep.top5, 1):
-        print(f"   {i}. {b.match:<26} {fmt_market(b.market):<13} {fmt_selection(b.selection):<8} "
-              f"cuota {b.odd:<5} EV +{b.ev:.1%} conf {b.confidence:.0f} "
+        print(f"   {i}. {b.match:<24} → {describe_pick(b.match, b.market, b.selection)}")
+        print(f"      cuota {b.odd} · EV +{b.ev:.1%} · conf {b.confidence:.0f} · "
               f"stake {b.stake_amount:.2f}€")
 
     labels = {"Conservadora": "C) COMBINADA CONSERVADORA (máx 2)",
@@ -191,8 +191,8 @@ def _print_strategies(refresh: bool = False) -> None:
         for p in rep.parlays:
             print(f"\n{labels.get(p.name, p.name)}")
             for leg in p.legs:
-                print(f"   - {leg.match:<26} {fmt_market(leg.market):<13} "
-                      f"{fmt_selection(leg.selection):<8} @ {leg.odd}")
+                print(f"   - {leg.match:<24} → {describe_pick(leg.match, leg.market, leg.selection)} "
+                      f"@ {leg.odd}")
             print(f"   Cuota total: {p.total_odd} | Prob. conjunta: {p.joint_prob:.1%} "
                   f"| EV: +{p.ev:.1%} | Riesgo: {p.risk}")
 

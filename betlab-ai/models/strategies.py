@@ -112,6 +112,31 @@ def fmt_selection(selection: str) -> str:
             "OVER": "Over", "UNDER": "Under", "YES": "Sí", "NO": "No"}.get(selection, selection)
 
 
+def describe_pick(match: str, market: str, selection: str) -> str:
+    """Explica en lenguaje simple QUÉ apostar (con el nombre del equipo).
+    Es lo que tenés que marcar en la casa de apuestas."""
+    home, _, away = match.partition(" vs ")
+    home, away = home.strip(), away.strip()
+    if market == "1X2":
+        return {"HOME": f"Gana {home}",
+                "DRAW": "Empate",
+                "AWAY": f"Gana {away}"}.get(selection, selection)
+    if market.startswith("OU_"):
+        line = market[3:]
+        if selection == "OVER":
+            return f"Más de {line} goles en el partido (sumando ambos equipos)"
+        if selection == "UNDER":
+            return f"Menos de {line} goles en el partido (sumando ambos equipos)"
+    if market == "BTTS":
+        return ("Ambos equipos marcan: SÍ" if selection == "YES"
+                else "Ambos equipos marcan: NO")
+    if market.startswith("AH_"):
+        line = market[3:]
+        team = home if selection == "HOME" else away
+        return f"{team} con hándicap {line} (le sumás {line} goles a su marcador)"
+    return f"{fmt_market(market)} {fmt_selection(selection)}"
+
+
 def _select_legs(max_legs: int, bets: list[ValueBet]) -> list[ValueBet]:
     """Elige hasta `max_legs` patas (una por fixture) por _premium_score."""
     chosen: list[ValueBet] = []

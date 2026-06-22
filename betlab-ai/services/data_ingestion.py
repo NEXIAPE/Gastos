@@ -146,6 +146,7 @@ def _ingest_intl(conn, odds: OddsAPIClient, counts: dict,
             "away_team_id": m["away"]["id"],
             "home_goals": m["home_goals"],
             "away_goals": m["away_goals"],
+            "neutral": m["neutral"],
         })
         counts["fixtures"] += 1
     if odds.enabled:

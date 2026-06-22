@@ -75,6 +75,7 @@ def _pending_fixtures() -> pd.DataFrame:
     sql = """
         SELECT f.id AS fixture_id, f.match_date, f.league_id,
                f.home_team_id, f.away_team_id,
+               COALESCE(f.neutral, 0) AS neutral,
                th.name AS home_name, ta.name AS away_name,
                lg.name AS league_name
         FROM fixtures f
@@ -162,7 +163,8 @@ def detect_value_bets(min_ev: float | None = None,
             no_bets.append((int(fx["fixture_id"]), match_label, "; ".join(fixture_reasons)))
             continue
 
-        lam_h, lam_a = expected_lambdas(home_r, away_r, league_avg)
+        neutral = bool(int(fx["neutral"])) if fx["neutral"] is not None else False
+        lam_h, lam_a = expected_lambdas(home_r, away_r, league_avg, neutral=neutral)
         model = PoissonModel(lam_h, lam_a, max_goals=settings.max_goals)
 
         fx_odds = odds[odds["fixture_id"] == fx["fixture_id"]]

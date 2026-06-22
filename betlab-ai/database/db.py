@@ -47,6 +47,14 @@ def init_db(db_path: Path | str = DB_PATH) -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     with session(db_path) as conn:
         conn.executescript(schema)
+        _migrate(conn)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Migraciones suaves para bases creadas con esquemas anteriores."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(fixtures)").fetchall()}
+    if "neutral" not in cols:
+        conn.execute("ALTER TABLE fixtures ADD COLUMN neutral INTEGER DEFAULT 0")
 
 
 def upsert(conn: sqlite3.Connection, table: str, row: dict[str, Any]) -> None:

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS fixtures (
     away_team_id    INTEGER NOT NULL,
     home_goals      INTEGER,                     -- NULL si no jugado
     away_goals      INTEGER,
+    neutral         INTEGER DEFAULT 0,           -- 1 si se juega en cancha neutral
     FOREIGN KEY (league_id)    REFERENCES leagues(id),
     FOREIGN KEY (home_team_id) REFERENCES teams(id),
     FOREIGN KEY (away_team_id) REFERENCES teams(id)

@@ -132,6 +132,10 @@ class Settings:
     # --- Datos --------------------------------------------------------------
     # Número de partidos recientes usados para calcular la "forma".
     form_matches: int = 5
+    # Vida media (días) para ponderar partidos por recencia en los ratings.
+    # Partidos más viejos pesan menos. ~540 días ≈ 1.5 años.
+    recency_halflife_days: float = field(
+        default_factory=lambda: _get_float("RECENCY_HALFLIFE_DAYS", 540.0))
     # Modo demo: si no hay claves de API se generan datos sintéticos.
     demo_mode: bool = field(
         default_factory=lambda: os.getenv("DEMO_MODE", "").lower() in {"1", "true", "yes"}

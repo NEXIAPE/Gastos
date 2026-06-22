@@ -60,6 +60,19 @@ def _blended_goals(goals: pd.Series, xg: pd.Series, w_xg: float = 0.4) -> pd.Ser
     return (1 - w_xg) * goals + w_xg * xg_filled
 
 
+def _recency_weights(dates: pd.Series) -> pd.Series:
+    """Peso exponencial por recencia: el partido más reciente pesa 1.0 y va
+    decayendo con vida media settings.recency_halflife_days."""
+    d = pd.to_datetime(dates, errors="coerce", utc=True)
+    ref = d.max()
+    if pd.isna(ref):
+        return pd.Series(1.0, index=dates.index)
+    age_days = (ref - d).dt.total_seconds() / 86400.0
+    half = max(1.0, settings.recency_halflife_days)
+    w = 0.5 ** (age_days / half)
+    return w.fillna(w.min() if w.notna().any() else 1.0)
+
+
 def compute_ratings(persist: bool = True) -> dict[int, TeamRating]:
     """Calcula los ratings de todos los equipos con partidos jugados."""
     df = _load_played_matches()
@@ -68,13 +81,13 @@ def compute_ratings(persist: bool = True) -> dict[int, TeamRating]:
 
     df["home_eff"] = _blended_goals(df["home_goals"], df["home_xg"])
     df["away_eff"] = _blended_goals(df["away_goals"], df["away_xg"])
+    df["w"] = _recency_weights(df["match_date"])
 
-    league_home_avg = df["home_eff"].mean()
-    league_away_avg = df["away_eff"].mean()
+    # Medias de liga ponderadas por recencia.
+    wsum = df["w"].sum() or 1.0
+    league_home_avg = (df["home_eff"] * df["w"]).sum() / wsum
+    league_away_avg = (df["away_eff"] * df["w"]).sum() / wsum
     league_avg = (league_home_avg + league_away_avg) / 2
-
-    # Ventaja de localía global de la liga.
-    global_home_adv = (league_home_avg / league_away_avg) if league_away_avg else settings.default_home_advantage
 
     team_ids = pd.unique(df[["home_team_id", "away_team_id"]].values.ravel())
     ratings: dict[int, TeamRating] = {}
@@ -82,19 +95,20 @@ def compute_ratings(persist: bool = True) -> dict[int, TeamRating]:
     for tid in team_ids:
         home = df[df["home_team_id"] == tid]
         away = df[df["away_team_id"] == tid]
-        n_home, n_away = len(home), len(away)
-
-        scored = (home["home_eff"].sum() + away["away_eff"].sum())
-        conceded = (home["away_eff"].sum() + away["home_eff"].sum())
-        n = n_home + n_away
-        if n == 0:
+        wh, wa = home["w"].sum(), away["w"].sum()
+        w_total = wh + wa
+        if w_total == 0:
             continue
 
-        attack = (scored / n) / league_avg if league_avg else 1.0
-        defense = (conceded / n) / league_avg if league_avg else 1.0
+        # Sumas ponderadas por recencia (partidos recientes pesan más).
+        scored = (home["home_eff"] * home["w"]).sum() + (away["away_eff"] * away["w"]).sum()
+        conceded = (home["away_eff"] * home["w"]).sum() + (away["home_eff"] * away["w"]).sum()
 
-        home_scored = (home["home_eff"].mean() if n_home else league_home_avg)
-        away_scored = (away["away_eff"].mean() if n_away else league_away_avg)
+        attack = (scored / w_total) / league_avg if league_avg else 1.0
+        defense = (conceded / w_total) / league_avg if league_avg else 1.0
+
+        home_scored = ((home["home_eff"] * home["w"]).sum() / wh) if wh else league_home_avg
+        away_scored = ((away["away_eff"] * away["w"]).sum() / wa) if wa else league_away_avg
         home_adv = (home_scored / league_home_avg) if league_home_avg else 1.0
         away_perf = (away_scored / league_away_avg) if league_away_avg else 1.0
 
@@ -146,7 +160,8 @@ def _persist(ratings: dict[int, TeamRating]) -> None:
 
 
 def expected_lambdas(home: TeamRating, away: TeamRating,
-                     league_avg_goals: float = 1.4) -> tuple[float, float]:
+                     league_avg_goals: float = 1.4,
+                     neutral: bool = False) -> tuple[float, float]:
     """
     Combina los ratings de dos equipos para estimar los goles esperados.
 
@@ -154,12 +169,18 @@ def expected_lambdas(home: TeamRating, away: TeamRating,
                       * ventaja_local * ajuste_forma
         lambda_away = media_liga * ataque_visitante * defensa_local
                       * rendimiento_visitante * ajuste_forma
+
+    En cancha neutral (p.ej. Mundial) no se aplica ventaja de localía ni
+    penalización de visitante: ningún equipo juega "en casa".
     """
     form_home = 0.9 + 0.2 * home.form     # forma escala el lambda en ±10%
     form_away = 0.9 + 0.2 * away.form
 
+    home_factor = 1.0 if neutral else home.home_advantage
+    away_factor = 1.0 if neutral else away.away_performance
+
     lam_home = (league_avg_goals * home.attack * away.defense
-                * home.home_advantage * form_home)
+                * home_factor * form_home)
     lam_away = (league_avg_goals * away.attack * home.defense
-                * away.away_performance * form_away)
+                * away_factor * form_away)
     return max(0.1, lam_home), max(0.1, lam_away)

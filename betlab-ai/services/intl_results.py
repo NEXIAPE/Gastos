@@ -84,6 +84,7 @@ def normalize_intl_match(row: dict[str, Any]) -> dict[str, Any] | None:
     status = "FT" if (hg is not None and ag is not None) else "NS"
     date = row.get("date", "") or ""
     year = int(date[:4]) if date[:4].isdigit() else None
+    neutral = 1 if str(row.get("neutral", "")).strip().lower() in ("true", "1", "yes") else 0
 
     return {
         "home": {"id": team_id(home), "name": home},
@@ -94,5 +95,6 @@ def normalize_intl_match(row: dict[str, Any]) -> dict[str, Any] | None:
         "home_goals": hg,
         "away_goals": ag,
         "season": year,
+        "neutral": neutral,
         "tournament": row.get("tournament", ""),
     }

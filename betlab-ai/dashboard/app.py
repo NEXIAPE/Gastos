@@ -139,12 +139,11 @@ def main() -> None:
         return
     init_db()
     _ensure_data()
-    st.title("⚽ BETLAB AI · Sistema de Value Betting")
-    st.caption("Poisson · xG · Elo · Confianza · Performance · Ligas · No-Bet · Bankroll · Backtesting")
+    st.markdown("## ⚽ BETLAB&nbsp;AI")
+    st.caption("Tus mejores apuestas del día, elegidas por valor matemático.")
 
     state = get_state()
     rep = load_strategies()
-    perf = perf_metrics(settings.bankroll)
 
     # --- Sidebar ------------------------------------------------------------
     with st.sidebar:
@@ -194,60 +193,61 @@ def main() -> None:
                 run_backtest()
             st.success("Backtest actualizado")
 
-    # --- KPIs (con ayuda al pasar el cursor) --------------------------------
+    tab_picks, tab_bets, tab_analysis = st.tabs(
+        ["🎯 Picks del día", "🧾 Mis Apuestas", "📊 Análisis"])
+
+    with tab_picks:
+        _tab_strategy(rep, state)
+    with tab_bets:
+        _tab_my_bets(rep)
+    with tab_analysis:
+        _kpis(rep, perf_metrics(settings.bankroll))
+        sub = st.tabs(["📈 Performance", "🏆 Ligas", "🧪 Backtest",
+                       "🚫 No Bet", "🧬 Factores"])
+        with sub[0]:
+            _tab_performance()
+        with sub[1]:
+            _tab_leagues()
+        with sub[2]:
+            _tab_backtest()
+        with sub[3]:
+            _tab_nobet()
+        with sub[4]:
+            _tab_factors(rep)
+
+
+def _kpis(rep, perf) -> None:
+    """Indicadores del track record del modelo (hipotético)."""
     c = st.columns(6)
-    c[0].metric("Picks elegibles", len(rep.pool),
+    c[0].metric("Picks hoy", len(rep.pool),
                 help="Apuestas con valor que el sistema encontró para hoy.")
     c[1].metric("ROI", f"{perf['roi'] * 100:.1f}%",
                 help="Retorno sobre lo invertido. Positivo = vas ganando.")
     c[2].metric("Yield", f"{perf['yield'] * 100:.1f}%",
                 help="Ganancia media por apuesta. Por encima de 0% es bueno.")
-    c[3].metric("Hit rate", f"{perf['hit_rate'] * 100:.0f}%",
-                help="% de apuestas acertadas. Ojo: con cuotas altas se puede "
-                     "ganar plata aun acertando menos de la mitad.")
+    c[3].metric("Acierto", f"{perf['hit_rate'] * 100:.0f}%",
+                help="% de apuestas acertadas.")
     c[4].metric("Max DD", f"{perf['max_drawdown'] * 100:.0f}%",
-                help="Máxima caída del bankroll desde un pico (drawdown). "
-                     "Cuanto más bajo, mejor.")
+                help="Máxima caída desde un pico. Cuanto más bajo, mejor.")
     c[5].metric("Profit", f"{perf['profit']:.0f}{CUR}",
-                help="Ganancia/pérdida total acumulada.")
+                help="Ganancia/pérdida acumulada del modelo (hipotético).")
+    st.caption("Estos números son del **modelo** (hipotéticos). Tu dinero real "
+               "está en la pestaña «Mis Apuestas».")
 
-    with st.expander("ℹ️ ¿Cómo leo todo esto? (guía para no expertos)"):
+
+def _glossary() -> None:
+    with st.expander("ℹ️ ¿Cómo leo un pick? (guía rápida)"):
         st.markdown(
-            "- **Qué apostar:** cada pick te dice en palabras la jugada exacta a "
-            "marcar en tu casa de apuestas (ej. *Gana Argentina*).\n"
-            "- **Cuota:** lo que paga la casa. Cuota 2.00 = si ganás, cobrás el doble.\n"
-            "- **Prob:** probabilidad que el modelo le da a que ocurra.\n"
-            "- **EV (valor esperado):** el corazón del sistema. Positivo = apuesta "
-            "con ventaja matemática a largo plazo. Cuanto más alto, mejor (pero un "
-            "EV altísimo, +100%, es sospechoso).\n"
-            "- **Confianza (0-100):** qué tan seguro está el modelo. 80+ = pick fuerte.\n"
-            "- **Stake:** cuánto apostar, ya calculado para cuidar tu dinero "
-            "(nunca arriesga de más).\n"
-            "- **1X2:** quién gana (o empate). **O/U:** total de goles. "
-            "**BTTS:** si ambos marcan.\n"
-            "- **Hándicap asiático:** ventaja/desventaja de goles. ⚠️ En tu casa "
-            "de apuestas elegí **«Hándicap Asiático»** (NO el «Hándicap» de 3 vías, "
-            "que es un mercado distinto). El pick te dice en palabras qué significa "
-            "la línea (ej. «gana por 2 goles o más»)."
+            "- **👉 Apostá a:** la jugada exacta a marcar en tu casa (ej. *Gana Argentina*).\n"
+            "- **Cuota:** lo que paga. Cuota 2.00 = si ganás, cobrás el doble.\n"
+            "- **EV (valor esperado):** el corazón del sistema. Positivo = ventaja "
+            "matemática. Si es altísimo (+100%), desconfiá.\n"
+            "- **Confianza (0-100):** qué tan seguro está el modelo. 80+ = fuerte.\n"
+            "- **Stake:** cuánto apostar (sugerido, cuidando tu dinero).\n"
+            "- **Mercados:** *1X2* quién gana · *O/U* total de goles · *BTTS* ambos "
+            "marcan · *Hándicap asiático* ventaja de goles (⚠️ elegí «Hándicap "
+            "Asiático» en tu casa, no el de 3 vías)."
         )
-
-    tabs = st.tabs(["🎯 Estrategia", "🧾 Mis Apuestas", "📈 Performance", "🏆 Ligas",
-                    "🧪 Backtest", "🚫 No Bet", "🧬 Factores"])
-
-    with tabs[0]:
-        _tab_strategy(rep, state)
-    with tabs[1]:
-        _tab_my_bets(rep)
-    with tabs[2]:
-        _tab_performance()
-    with tabs[3]:
-        _tab_leagues()
-    with tabs[4]:
-        _tab_backtest()
-    with tabs[5]:
-        _tab_nobet()
-    with tabs[6]:
-        _tab_factors(rep)
 
 
 def _tab_my_bets(rep) -> None:
@@ -365,9 +365,20 @@ def _tab_my_bets(rep) -> None:
 
 
 def _tab_strategy(rep, state) -> None:
-    st.subheader("Estrategia diaria")
+    _glossary()
+
+    # Estado vacío unificado y amable.
+    if not rep.premium and not rep.top5 and not rep.has_combos:
+        st.info("### 🕑 No hay picks ahora mismo\n"
+                "Esto pasa cuando **no hay cuotas cargadas** o no hay partidos próximos. "
+                "Probá:\n"
+                "1. En la barra lateral, elegí la liga y apretá **🔄 Actualizar datos**.\n"
+                "2. Fijate el mensaje: si dice «0 cuotas», la casa aún no publicó cuotas "
+                "para esos partidos (volvé más cerca de la fecha del partido).")
+        return
+
     if state.mode != "NORMAL":
-        st.warning(f"Bankroll en modo **{state.mode}**: "
+        st.warning(f"Modo de riesgo **{state.mode}**: "
                    + ("stakes reducidos al 50%." if state.mode == "REDUCED"
                       else "solo picks confianza > 90, stake máx 1% y SIN combinadas."))
 

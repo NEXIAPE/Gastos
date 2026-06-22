@@ -17,7 +17,10 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    # Carga el .env de la carpeta del proyecto, sin depender del directorio
+    # de trabajo desde el que se ejecute el comando.
+    _ENV_PATH = Path(__file__).resolve().parent / ".env"
+    load_dotenv(dotenv_path=_ENV_PATH if _ENV_PATH.exists() else None)
 except Exception:  # pragma: no cover - dotenv es opcional
     pass
 

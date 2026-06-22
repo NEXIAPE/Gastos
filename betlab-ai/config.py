@@ -43,16 +43,24 @@ def _get_float(name: str, default: float) -> float:
         return default
 
 
+def _get_secret(name: str) -> str:
+    """Lee una clave de entorno limpiando espacios y comentarios inline (#...)
+    que algunas versiones de dotenv no eliminan. Las claves reales no llevan
+    espacios ni '#', así que esto es seguro."""
+    raw = os.getenv(name, "") or ""
+    return raw.split("#", 1)[0].strip()
+
+
 @dataclass(frozen=True)
 class Settings:
     """Parámetros globales del sistema."""
 
     # --- Claves de API ------------------------------------------------------
-    api_football_key: str = field(default_factory=lambda: os.getenv("API_FOOTBALL_KEY", ""))
+    api_football_key: str = field(default_factory=lambda: _get_secret("API_FOOTBALL_KEY"))
     api_football_host: str = field(
         default_factory=lambda: os.getenv("API_FOOTBALL_HOST") or "v3.football.api-sports.io"
     )
-    odds_api_key: str = field(default_factory=lambda: os.getenv("ODDS_API_KEY", ""))
+    odds_api_key: str = field(default_factory=lambda: _get_secret("ODDS_API_KEY"))
     # Clave de competición de The Odds API (p.ej. soccer_fifa_world_cup,
     # soccer_epl, soccer_spain_la_liga, upcoming). Solo aplica a esa fuente.
     odds_sport: str = field(default_factory=lambda: os.getenv("ODDS_SPORT", "upcoming"))

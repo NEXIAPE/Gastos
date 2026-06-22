@@ -169,7 +169,11 @@ def main() -> None:
             "- **Stake:** cuánto apostar, ya calculado para cuidar tu dinero "
             "(nunca arriesga de más).\n"
             "- **1X2:** quién gana (o empate). **O/U:** total de goles. "
-            "**BTTS:** si ambos marcan. **Hándicap:** ventaja/desventaja de goles."
+            "**BTTS:** si ambos marcan.\n"
+            "- **Hándicap asiático:** ventaja/desventaja de goles. ⚠️ En tu casa "
+            "de apuestas elegí **«Hándicap Asiático»** (NO el «Hándicap» de 3 vías, "
+            "que es un mercado distinto). El pick te dice en palabras qué significa "
+            "la línea (ej. «gana por 2 goles o más»)."
         )
 
     tabs = st.tabs(["🎯 Estrategia", "📈 Performance", "🏆 Ligas",

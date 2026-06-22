@@ -131,9 +131,21 @@ def describe_pick(match: str, market: str, selection: str) -> str:
         return ("Ambos equipos marcan: SÍ" if selection == "YES"
                 else "Ambos equipos marcan: NO")
     if market.startswith("AH_"):
-        line = market[3:]
         team = home if selection == "HOME" else away
-        return f"{team} con hándicap {line} (le sumás {line} goles a su marcador)"
+        try:
+            line = float(market[3:])
+        except ValueError:
+            return f"Hándicap asiático: {home if selection=='HOME' else away} {market[3:]}"
+        meanings = {
+            -0.5: f"gana {team}",
+            0.5: f"{team} gana o empata",
+            -1.5: f"{team} gana por 2 goles o más",
+            1.5: f"{team} gana, empata o pierde por 1 gol",
+            -2.5: f"{team} gana por 3 goles o más",
+            2.5: f"{team} gana, empata o pierde por 1 o 2 goles",
+        }
+        meaning = meanings.get(line, f"{team} con línea {line:+g}")
+        return f"Hándicap asiático ({line:+g}): {meaning}"
     return f"{fmt_market(market)} {fmt_selection(selection)}"
 
 

@@ -69,6 +69,11 @@ class Settings:
     footballdata_token: str = field(default_factory=lambda: _get_secret("FOOTBALLDATA_TOKEN"))
     # Código de competición de football-data.org (WC, PL, PD, CL, SA, BL1, FL1...).
     fd_competition: str = field(default_factory=lambda: (os.getenv("FD_COMPETITION", "") or "").strip())
+    # Base pública de TODOS los partidos internacionales (selecciones) para el
+    # historial. Se activa con FD_COMPETITION=INTL.
+    intl_results_url: str = field(default_factory=lambda: (os.getenv("INTL_RESULTS_URL", "") or "").strip())
+    # Año desde el que se carga historial internacional (recencia vs volumen).
+    intl_since: int = field(default_factory=lambda: int(_get_float("INTL_SINCE", 2018)))
     # Filtro opcional de ingesta para no agotar la cuota de la API: limita la
     # descarga a una liga/competición y temporada concretas. Mundial -> 1 / 2026.
     league_id: int | None = field(

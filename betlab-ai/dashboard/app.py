@@ -54,7 +54,8 @@ MODE_COLOR = {"NORMAL": "🟢", "REDUCED": "🟡", "CONSERVATION": "🔴"}
 
 # Liga/competición -> (código football-data.org, sport key de The Odds API).
 LEAGUES = {
-    "🌍 Mundial (selecciones)": ("WC", "soccer_fifa_world_cup"),
+    "🌍 Mundial 2026 (historial completo)": ("INTL", "soccer_fifa_world_cup"),
+    "🌍 Mundial (solo partidos del torneo)": ("WC", "soccer_fifa_world_cup"),
     "🇪🇺 Eurocopa (selecciones)": ("EC", "soccer_uefa_european_championship"),
     "🏴 Premier League (Inglaterra)": ("PL", "soccer_epl"),
     "🇪🇸 La Liga (España)": ("PD", "soccer_spain_la_liga"),

@@ -46,14 +46,22 @@ def ingest(target_date: str | None = None, league: int | None = None,
     odds = OddsAPIClient()
     fd = FootballDataClient()
 
+    counts = {"fixtures": 0, "stats": 0, "odds": 0, "injuries": 0}
+    use_oddsapi = odds.enabled
+
+    # --- Fuente: historial internacional completo (selecciones) -----------
+    effective_comp = (competition or settings.fd_competition or "").strip().lower()
+    if effective_comp in ("intl", "selecciones", "world", "wc_full"):
+        with session() as conn:
+            _ingest_intl(conn, odds, counts, settings.intl_since, odds_sport)
+        counts["mode"] = 1
+        return counts
+
     if not (football.enabled or odds.enabled or fd.enabled):
         from services.demo_data import seed_database
 
         seed_database()
         return {"mode": 0, "fixtures": 0, "demo": 1}
-
-    counts = {"fixtures": 0, "stats": 0, "odds": 0, "injuries": 0}
-    use_oddsapi = odds.enabled
 
     with session() as conn:
         if fd.enabled:
@@ -111,6 +119,37 @@ def ingest(target_date: str | None = None, league: int | None = None,
 
     counts["mode"] = 1
     return counts
+
+
+def _ingest_intl(conn, odds: OddsAPIClient, counts: dict,
+                 since_year: int, odds_sport: str | None) -> None:
+    """Carga el historial internacional de selecciones (una sola fuente) y, si
+    hay clave, las cuotas del Mundial desde The Odds API."""
+    from services.intl_results import load_results, normalize_intl_match
+
+    INTL_LEAGUE_ID = 9001
+    upsert(conn, "leagues", {"id": INTL_LEAGUE_ID, "name": "Selecciones (Internacional)",
+                             "country": "World", "season": None})
+    for row in load_results(since_year=since_year):
+        m = normalize_intl_match(row)
+        if m is None:
+            continue
+        for side in ("home", "away"):
+            upsert(conn, "teams", {"id": m[side]["id"], "name": m[side]["name"], "logo": ""})
+        upsert(conn, "fixtures", {
+            "id": m["fixture_id"],
+            "league_id": INTL_LEAGUE_ID,
+            "season": m["season"],
+            "match_date": m["match_date"],
+            "status": m["status"],
+            "home_team_id": m["home"]["id"],
+            "away_team_id": m["away"]["id"],
+            "home_goals": m["home_goals"],
+            "away_goals": m["away_goals"],
+        })
+        counts["fixtures"] += 1
+    if odds.enabled:
+        _ingest_odds_api(conn, odds, counts, odds_sport=odds_sport)
 
 
 def _parse_competitions(spec: str, default_season: int | None) -> list[tuple[str, int | None]]:
@@ -243,12 +282,27 @@ def _index_fixtures(conn) -> dict[tuple[str, str], int]:
         "JOIN teams ta ON ta.id = f.away_team_id "
         "WHERE f.status = 'NS'"
     ).fetchall()
-    return {(r["home"].lower(), r["away"].lower()): r["id"] for r in rows}
+    return {(_norm_team(r["home"]), _norm_team(r["away"])): r["id"] for r in rows}
+
+
+# Alias para emparejar nombres distintos entre fuentes (CSV vs The Odds API).
+_TEAM_ALIASES = {
+    "usa": "united states", "korea republic": "south korea",
+    "korea dpr": "north korea", "ir iran": "iran", "china pr": "china",
+    "czech republic": "czechia", "türkiye": "turkey", "turkiye": "turkey",
+    "cote d'ivoire": "ivory coast", "côte d'ivoire": "ivory coast",
+    "congo dr": "dr congo", "bosnia and herzegovina": "bosnia-herzegovina",
+}
+
+
+def _norm_team(name: str | None) -> str:
+    n = (name or "").strip().lower()
+    return _TEAM_ALIASES.get(n, n)
 
 
 def _match_event_to_fixture(event: dict, index: dict) -> int | None:
-    home = (event.get("home_team") or "").lower()
-    away = (event.get("away_team") or "").lower()
+    home = _norm_team(event.get("home_team"))
+    away = _norm_team(event.get("away_team"))
     return index.get((home, away))
 
 

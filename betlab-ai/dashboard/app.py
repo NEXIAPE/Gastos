@@ -101,7 +101,37 @@ def load_strategies():
     return build_strategies()
 
 
+def _check_login() -> bool:
+    """Login con usuario/contraseña definidos en Secrets (sección [auth]).
+    Si no hay credenciales configuradas, la app queda abierta (uso local)."""
+    try:
+        users = dict(st.secrets["auth"]) if "auth" in st.secrets else {}
+    except Exception:
+        users = {}
+    if not users:
+        return True
+    if st.session_state.get("_authed"):
+        return True
+
+    st.title("🔒 BETLAB AI")
+    st.caption("Acceso restringido. Ingresá tus credenciales.")
+    with st.form("login"):
+        user = st.text_input("Usuario")
+        pwd = st.text_input("Contraseña", type="password")
+        ok = st.form_submit_button("Entrar")
+    if ok:
+        if user in users and str(users[user]) == pwd:
+            st.session_state["_authed"] = True
+            st.session_state["_user"] = user
+            st.rerun()
+        else:
+            st.error("Usuario o contraseña incorrectos.")
+    return False
+
+
 def main() -> None:
+    if not _check_login():
+        return
     init_db()
     _ensure_data()
     st.title("⚽ BETLAB AI · Sistema de Value Betting")
@@ -113,6 +143,12 @@ def main() -> None:
 
     # --- Sidebar ------------------------------------------------------------
     with st.sidebar:
+        if st.session_state.get("_user"):
+            cols = st.columns([2, 1])
+            cols[0].caption(f"👤 {st.session_state['_user']}")
+            if cols[1].button("Salir"):
+                st.session_state.clear()
+                st.rerun()
         st.header("Bankroll Manager")
         st.metric("Bankroll", f"{state.current:.0f}€", f"{(state.current - state.initial):+.0f}€")
         st.write(f"**Modo:** {MODE_COLOR.get(state.mode,'')} {state.mode}")

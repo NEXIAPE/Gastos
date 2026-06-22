@@ -176,7 +176,7 @@ def _ingest_odds_api(conn, odds: OddsAPIClient, counts: dict,
     events = odds.get_odds(
         sport=odds_sport or settings.odds_sport,
         regions=settings.odds_regions,
-        markets="h2h,totals,spreads",
+        markets=settings.odds_markets,
     )
     fixtures_by_teams = _index_fixtures(conn)
     for event in events:

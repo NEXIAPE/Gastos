@@ -26,6 +26,8 @@ MARKET_MAP = {
     "totals": "OU",
     "spreads": "AH",
     "btts": "BTTS",
+    "alternate_totals": "OU",     # abanico completo de líneas Over/Under
+    "alternate_spreads": "AH",    # abanico completo de hándicaps
 }
 
 

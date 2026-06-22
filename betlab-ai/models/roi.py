@@ -41,9 +41,9 @@ def log_value_bets() -> int:
     return inserted
 
 
-def get_deposit() -> float:
-    """Capital inicial (depósito) que el usuario cargó para su traza."""
-    df = query_df("SELECT value FROM app_settings WHERE key = 'deposit'")
+def get_deposit(user: str = "default") -> float:
+    """Capital inicial (depósito) del usuario para su traza."""
+    df = query_df("SELECT value FROM app_settings WHERE key = ?", [f"deposit:{user}"])
     if df.empty:
         return 0.0
     try:
@@ -52,16 +52,17 @@ def get_deposit() -> float:
         return 0.0
 
 
-def set_deposit(amount: float) -> None:
+def set_deposit(amount: float, user: str = "default") -> None:
     with session() as conn:
         conn.execute(
-            "INSERT INTO app_settings (key, value) VALUES ('deposit', ?) "
+            "INSERT INTO app_settings (key, value) VALUES (?, ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (str(float(amount)),))
+            (f"deposit:{user}", str(float(amount))))
 
 
 def log_manual_bet(description: str, odd: float, stake: float,
-                   market: str = "MANUAL", selection: str = "-") -> int:
+                   market: str = "MANUAL", selection: str = "-",
+                   user: str = "default") -> int:
     """Registra una apuesta cargada a mano por el usuario (queda PENDING)."""
     with session() as conn:
         # Garantiza el partido "sentinela" (id 0) por si fue borrado en un reseed.
@@ -71,24 +72,25 @@ def log_manual_bet(description: str, odd: float, stake: float,
             "VALUES (0, '', 'MANUAL', 0, 0)")
         cur = conn.execute(
             "INSERT INTO bet_log (fixture_id, market, selection, odd, stake_amount, "
-            " status, note, manual) VALUES (0, ?, ?, ?, ?, 'PENDING', ?, 1)",
-            (market, selection, float(odd), float(stake), description),
+            " status, note, manual, user) VALUES (0, ?, ?, ?, ?, 'PENDING', ?, 1, ?)",
+            (market, selection, float(odd), float(stake), description, user),
         )
         return int(cur.lastrowid)
 
 
-def manual_bets() -> "pd.DataFrame":
-    """Todas las apuestas manuales (la traza del usuario), más recientes primero."""
+def manual_bets(user: str = "default") -> "pd.DataFrame":
+    """Apuestas manuales del usuario (su traza), más recientes primero."""
     return query_df(
         "SELECT id, note, odd, stake_amount, status, profit, placed_at, settled_at "
-        "FROM bet_log WHERE manual = 1 ORDER BY id DESC"
+        "FROM bet_log WHERE manual = 1 AND user = ? ORDER BY id DESC", [user]
     )
 
 
-def manual_ledger(start: float = 0.0) -> dict[str, float]:
-    """Resumen de la traza manual: balance (desde 'start'), pendiente, ROI."""
+def manual_ledger(start: float = 0.0, user: str = "default") -> dict[str, float]:
+    """Resumen de la traza manual del usuario: balance, pendiente, ROI."""
     df = query_df(
-        "SELECT status, stake_amount, profit FROM bet_log WHERE manual = 1"
+        "SELECT status, stake_amount, profit FROM bet_log WHERE manual = 1 AND user = ?",
+        [user]
     )
     if df.empty:
         return {"balance": round(start, 2), "pending_stake": 0.0, "staked": 0.0,

@@ -60,6 +60,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE bet_log ADD COLUMN note TEXT")
     if "manual" not in bl:
         conn.execute("ALTER TABLE bet_log ADD COLUMN manual INTEGER DEFAULT 0")
+    if "user" not in bl:
+        conn.execute("ALTER TABLE bet_log ADD COLUMN user TEXT DEFAULT 'default'")
     # Equipo/partido "sentinela" (id 0) para apuestas manuales sin fixture real.
     # Tiene status 'MANUAL' por lo que queda fuera de las consultas del modelo.
     conn.execute("INSERT OR IGNORE INTO teams (id, name) VALUES (0, 'Manual')")

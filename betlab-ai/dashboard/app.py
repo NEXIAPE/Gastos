@@ -116,6 +116,11 @@ def _hero() -> None:
         '<p>Tus mejores apuestas del día, elegidas por valor matemático.</p></div>',
         unsafe_allow_html=True)
 
+
+def _current_user() -> str:
+    """Usuario logueado (cada uno tiene sus propias apuestas y depósito)."""
+    return st.session_state.get("_user") or "default"
+
 # Liga/competición -> (código football-data.org, sport key de The Odds API).
 LEAGUES = {
     "🌍 Mundial 2026 (historial completo)": ("INTL", "soccer_fifa_world_cup"),
@@ -206,7 +211,8 @@ def main() -> None:
                 st.session_state.clear()
                 st.rerun()
         from models.roi import get_deposit, manual_ledger
-        _led = manual_ledger(start=get_deposit())
+        _u = _current_user()
+        _led = manual_ledger(start=get_deposit(_u), user=_u)
         st.header("💰 Mi dinero")
         st.metric("Balance actual", f"{_led['balance']:.2f}{CUR}",
                   f"{_led['profit']:+.2f}{CUR}")
@@ -312,7 +318,8 @@ def _tab_my_bets(rep) -> None:
     st.caption("Anotá las apuestas que hacés de verdad. Podés **editar cuota, stake y "
                "estado** en la tabla (la cuota real de tu casa suele diferir un poco).")
 
-    deposit = get_deposit()
+    user = _current_user()
+    deposit = get_deposit(user)
     with st.expander("💰 Capital inicial (depósito)", expanded=(deposit == 0)):
         st.caption("Cuánta plata pusiste para apostar. El «Dinero actual» = "
                    "este capital + tu ganancia/pérdida.")
@@ -320,10 +327,10 @@ def _tab_my_bets(rep) -> None:
         new_dep = c[0].number_input(f"Capital ({CUR})", min_value=0.0,
                                     value=float(deposit), step=10.0)
         if c[1].button("Guardar capital"):
-            set_deposit(new_dep)
+            set_deposit(new_dep, user=user)
             st.rerun()
 
-    led = manual_ledger(start=deposit)
+    led = manual_ledger(start=deposit, user=user)
     k = st.columns(4)
     k[0].metric("💵 Dinero actual", f"{led['balance']:.2f}{CUR}",
                 f"{led['profit']:+.2f}{CUR}",
@@ -374,7 +381,7 @@ def _tab_my_bets(rep) -> None:
                 st.rerun()
 
     # --- Traza editable ---
-    df = manual_bets()
+    df = manual_bets(user)
     if df.empty:
         st.info("Todavía no registraste apuestas. Usá «Registrar una apuesta nueva».")
         return
@@ -440,11 +447,13 @@ def _tab_strategy(rep, state) -> None:
     st.caption("En cada pick poné **cuánto querés apostar** y tocá **➕ Apostar**: "
                "queda guardado en **🧾 Mis Apuestas** (editable después).")
 
+    user = _current_user()
+
     def _bet_controls(desc, odd, key):
         stake = st.number_input(f"Monto ({CUR})", min_value=0.0, value=5.0, step=1.0,
                                 key=f"stk_{key}", label_visibility="collapsed")
         if st.button("➕ Apostar", key=f"btn_{key}", use_container_width=True):
-            log_manual_bet(desc, float(odd), float(stake))
+            log_manual_bet(desc, float(odd), float(stake), user=user)
             st.toast(f"Registrado en Mis Apuestas: {desc[:38]}… ✅")
 
     # A) Pick premium

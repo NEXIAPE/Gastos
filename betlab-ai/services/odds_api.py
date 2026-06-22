@@ -55,9 +55,19 @@ class OddsAPIClient:
             "markets": markets,
             "oddsFormat": odds_format,
         }
-        resp = self.session.get(url, params=params, timeout=TIMEOUT)
-        resp.raise_for_status()
-        return resp.json() or []
+        # Un fallo de cuotas (sport inactivo, créditos agotados, mercado no
+        # soportado...) no debe tumbar la app: se devuelve lista vacía.
+        try:
+            resp = self.session.get(url, params=params, timeout=TIMEOUT)
+            resp.raise_for_status()
+            return resp.json() or []
+        except requests.RequestException:
+            self.last_error = None
+            try:
+                self.last_error = resp.status_code  # type: ignore[name-defined]
+            except Exception:
+                pass
+            return []
 
 
 def normalize_event_odds(event: dict[str, Any]) -> list[dict[str, Any]]:

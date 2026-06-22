@@ -65,11 +65,11 @@ class Settings:
     # soccer_epl, soccer_spain_la_liga, upcoming). Solo aplica a esa fuente.
     odds_sport: str = field(default_factory=lambda: os.getenv("ODDS_SPORT", "upcoming"))
     odds_regions: str = field(default_factory=lambda: os.getenv("ODDS_REGIONS", "eu"))
-    # Mercados a pedir a The Odds API. Por defecto incluye BTTS. Para el abanico
-    # completo de líneas: "h2h,totals,spreads,btts,alternate_totals,alternate_spreads"
-    # (consume más créditos de la API).
+    # Mercados a pedir a The Odds API (endpoint masivo: solo h2h, totals,
+    # spreads). BTTS y líneas alternativas requieren el endpoint por-evento y
+    # no se piden aquí para no provocar errores.
     odds_markets: str = field(default_factory=lambda: (
-        os.getenv("ODDS_MARKETS", "") or "h2h,totals,spreads,btts").strip())
+        os.getenv("ODDS_MARKETS", "") or "h2h,totals,spreads").strip())
     # football-data.org: fuente gratuita con temporadas ACTUALES (incl. Mundial).
     footballdata_token: str = field(default_factory=lambda: _get_secret("FOOTBALLDATA_TOKEN"))
     # Código de competición de football-data.org (WC, PL, PD, CL, SA, BL1, FL1...).

@@ -87,9 +87,13 @@ def _ensure_data() -> None:
     Permite abrir la app desplegada (p.ej. Streamlit Cloud) sin configurar nada."""
     n = query_df("SELECT COUNT(*) AS c FROM fixtures")["c"].iloc[0]
     if n == 0:
-        with st.spinner("Inicializando datos (primera carga, ~10 s)..."):
+        with st.spinner("Inicializando datos (primera carga, ~10-20 s)..."):
             from services.data_ingestion import ingest
-            ingest()
+            try:
+                ingest()
+            except Exception as e:  # nunca dejar caer la app por la ingesta
+                st.warning(f"No se pudieron cargar todos los datos ahora ({e}). "
+                           "Probá el botón 🔄 Actualizar datos.")
         load_strategies.clear()
 
 
@@ -165,16 +169,19 @@ def main() -> None:
                                       "varias temporadas: los partidos se acumulan.")
         if st.button("🔄 Actualizar datos", use_container_width=True):
             code, odds_key = LEAGUES[league_name]
-            with st.spinner(f"Descargando {league_name} ({int(season)})..."):
-                summary = ingest(competition=code, season=int(season), odds_sport=odds_key)
-            load_strategies.clear()
-            if summary.get("demo"):
-                st.warning("Sin claves de API: se usaron datos demo. "
-                           "Configura FOOTBALLDATA_TOKEN/ODDS_API_KEY en .env.")
-            else:
-                st.success(f"✔ {summary.get('fixtures',0)} partidos · "
-                           f"{summary.get('odds',0)} cuotas")
-            st.rerun()
+            try:
+                with st.spinner(f"Descargando {league_name} ({int(season)})..."):
+                    summary = ingest(competition=code, season=int(season), odds_sport=odds_key)
+                load_strategies.clear()
+                if summary.get("demo"):
+                    st.warning("Sin claves de API: se usaron datos demo. "
+                               "Configura FOOTBALLDATA_TOKEN/ODDS_API_KEY en Secrets.")
+                else:
+                    st.success(f"✔ {summary.get('fixtures',0)} partidos · "
+                               f"{summary.get('odds',0)} cuotas")
+                st.rerun()
+            except Exception as e:
+                st.error(f"No se pudo actualizar: {e}")
         st.divider()
         if st.button("🧮 Recalcular picks"):
             load_strategies.clear(); st.rerun()

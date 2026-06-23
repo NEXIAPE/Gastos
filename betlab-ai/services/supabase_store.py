@@ -66,12 +66,16 @@ def add_bet(owner: str, note: str, odd: float, stake: float) -> int | None:
 
 
 def list_bets(owner: str) -> list[dict[str, Any]]:
-    r = requests.get(f"{_base()}/bets",
-                     params={"owner": f"eq.{owner}", "order": "id.desc"},
-                     headers=_headers(), timeout=TIMEOUT)
-    r.raise_for_status()
+    try:
+        r = requests.get(f"{_base()}/bets",
+                         params={"owner": f"eq.{owner}", "order": "id.desc"},
+                         headers=_headers(), timeout=TIMEOUT)
+        r.raise_for_status()
+        rows = r.json()
+    except requests.RequestException:
+        return []
     out = []
-    for b in r.json():
+    for b in rows:
         out.append({
             "id": b["id"], "note": b.get("note"), "odd": b.get("odd"),
             "stake_amount": b.get("stake"), "status": b.get("status"),
@@ -119,14 +123,14 @@ def delete_bet(bet_id: int) -> None:
 
 # --- Depósito --------------------------------------------------------------
 def get_deposit(owner: str) -> float:
-    r = requests.get(f"{_base()}/deposits",
-                     params={"owner": f"eq.{owner}", "select": "amount"},
-                     headers=_headers(), timeout=TIMEOUT)
-    r.raise_for_status()
-    d = r.json()
     try:
+        r = requests.get(f"{_base()}/deposits",
+                         params={"owner": f"eq.{owner}", "select": "amount"},
+                         headers=_headers(), timeout=TIMEOUT)
+        r.raise_for_status()
+        d = r.json()
         return float(d[0]["amount"]) if d else 0.0
-    except (ValueError, TypeError, KeyError):
+    except (requests.RequestException, ValueError, TypeError, KeyError):
         return 0.0
 
 

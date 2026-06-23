@@ -327,8 +327,11 @@ def _tab_my_bets(rep) -> None:
         new_dep = c[0].number_input(f"Capital ({CUR})", min_value=0.0,
                                     value=float(deposit), step=10.0)
         if c[1].button("Guardar capital"):
-            set_deposit(new_dep, user=user)
-            st.rerun()
+            try:
+                set_deposit(new_dep, user=user)
+                st.rerun()
+            except Exception as e:
+                st.error(f"No se pudo guardar: {e}")
 
     led = manual_ledger(start=deposit, user=user)
     k = st.columns(4)
@@ -412,16 +415,26 @@ def _tab_my_bets(rep) -> None:
     )
     if st.button("💾 Guardar cambios", type="primary"):
         orig = df.set_index("id")
-        for _, row in edited.iterrows():
-            bid = int(row["id"])
-            o = orig.loc[bid]
-            update_bet(bid, odd=float(row["Cuota"]), stake=float(row["Stake"]),
-                       note=str(row["Apuesta"]))
-            new_status = INV.get(row["Estado"], "PENDING")
-            if new_status != o["status"]:
-                set_bet_status(bid, new_status)
-        st.success("Cambios guardados.")
-        st.rerun()
+        try:
+            n = 0
+            for _, row in edited.iterrows():
+                bid = int(row["id"])
+                o = orig.loc[bid]
+                # Solo persiste las filas que realmente cambiaron.
+                if (float(row["Cuota"]) != float(o["odd"])
+                        or float(row["Stake"]) != float(o["stake_amount"])
+                        or str(row["Apuesta"]) != str(o["note"])):
+                    update_bet(bid, odd=float(row["Cuota"]), stake=float(row["Stake"]),
+                               note=str(row["Apuesta"]))
+                    n += 1
+                new_status = INV.get(row["Estado"], "PENDING")
+                if new_status != o["status"]:
+                    set_bet_status(bid, new_status)
+                    n += 1
+            st.success(f"Cambios guardados ({n}).")
+            st.rerun()
+        except Exception as e:
+            st.error(f"No se pudo guardar: {e}")
 
 
 def _tab_strategy(rep, state) -> None:
@@ -453,8 +466,11 @@ def _tab_strategy(rep, state) -> None:
         stake = st.number_input(f"Monto ({CUR})", min_value=0.0, value=5.0, step=1.0,
                                 key=f"stk_{key}", label_visibility="collapsed")
         if st.button("➕ Apostar", key=f"btn_{key}", use_container_width=True):
-            log_manual_bet(desc, float(odd), float(stake), user=user)
-            st.toast(f"Registrado en Mis Apuestas: {desc[:38]}… ✅")
+            try:
+                log_manual_bet(desc, float(odd), float(stake), user=user)
+                st.toast(f"Registrado en Mis Apuestas: {desc[:38]}… ✅")
+            except Exception as e:
+                st.error(f"No se pudo registrar: {e}")
 
     # A) Pick premium
     if rep.premium:

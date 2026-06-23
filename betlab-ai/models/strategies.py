@@ -81,6 +81,36 @@ def _risk_adjusted_ev(b: ValueBet) -> float:
     return b.ev * (b.confidence / 100.0)
 
 
+def _outcome_signature(b: ValueBet) -> tuple:
+    """Firma del resultado al que apunta una apuesta. Apuestas con la misma
+    firma son equivalentes (p.ej. 1X2 'gana local' == hándicap asiático -0.5):
+    se conserva solo una (la de mayor EV)."""
+    m, s = b.market, b.selection
+    if m == "1X2":
+        return (b.fixture_id, "WIN", s)            # HOME/DRAW/AWAY
+    if m.startswith("AH_"):
+        try:
+            line = float(m[3:])
+        except ValueError:
+            return (b.fixture_id, m, s)
+        if line == -0.5:                           # ganar sin empate == 1X2 WIN
+            return (b.fixture_id, "WIN", s)
+        if line == 0.5:                            # doble oportunidad
+            return (b.fixture_id, "DC", s)
+        return (b.fixture_id, m, s)                # otras líneas: distintas
+    return (b.fixture_id, m, s)
+
+
+def _dedupe_equivalent(pool: list[ValueBet]) -> list[ValueBet]:
+    """Quita apuestas equivalentes del mismo partido, dejando la de mayor EV."""
+    best: dict[tuple, ValueBet] = {}
+    for b in sorted(pool, key=lambda x: x.ev, reverse=True):
+        sig = _outcome_signature(b)
+        if sig not in best:
+            best[sig] = b
+    return list(best.values())
+
+
 def _parlay_risk(joint_prob: float, n_legs: int) -> str:
     """Riesgo cualitativo según la probabilidad conjunta de acierto."""
     if joint_prob >= 0.40:
@@ -216,6 +246,7 @@ def build_strategies(bets: list[ValueBet] | None = None,
         and b.confidence >= min_conf
         and settings.odd_min <= b.odd <= settings.odd_max
     ]
+    pool = _dedupe_equivalent(pool)  # evita la misma jugada repetida (1X2 vs AH-0.5)
 
     # A) Pick premium: mayor EV AJUSTADO POR RIESGO.
     premium = max(pool, key=_risk_adjusted_ev) if pool else None

@@ -121,6 +121,15 @@ def _current_user() -> str:
     """Usuario logueado (cada uno tiene sus propias apuestas y depósito)."""
     return st.session_state.get("_user") or "default"
 
+
+def _ev_warn(ev: float) -> str:
+    """Aviso si el EV es sospechosamente alto (poco fiable)."""
+    if ev >= max(0.80, settings.ev_warn * 2):
+        return "🚩 EV irreal — muy poco fiable (datos escasos)"
+    if ev >= settings.ev_warn:
+        return "⚠️ EV alto — desconfiá (típico de torneos/datos flacos)"
+    return ""
+
 # Liga/competición -> (código football-data.org, sport key de The Odds API).
 LEAGUES = {
     "🌍 Mundial 2026 (historial completo)": ("INTL", "soccer_fifa_world_cup"),
@@ -300,7 +309,8 @@ def _glossary() -> None:
             "- **👉 Apostá a:** la jugada exacta a marcar en tu casa (ej. *Gana Argentina*).\n"
             "- **Cuota:** lo que paga. Cuota 2.00 = si ganás, cobrás el doble.\n"
             "- **EV (valor esperado):** el corazón del sistema. Positivo = ventaja "
-            "matemática. Si es altísimo (+100%), desconfiá.\n"
+            "matemática. **⚠️ Si ves la alerta naranja «EV alto», desconfiá**: suele "
+            "ser un número inflado por datos escasos (típico del Mundial).\n"
             "- **Confianza (0-100):** qué tan seguro está el modelo. 80+ = fuerte.\n"
             "- **Stake:** cuánto apostar (sugerido, cuidando tu dinero).\n"
             "- **Mercados:** *1X2* quién gana · *O/U* total de goles · *BTTS* ambos "
@@ -484,6 +494,9 @@ def _tab_strategy(rep, state) -> None:
                 f"👉 **{describe_pick(b.match, b.market, b.selection)}**  \n"
                 f"🎯 Cuota **{b.odd}**  ·  📈 EV **+{b.ev:.1%}**  ·  "
                 f"🔵 Confianza **{b.confidence:.0f}** · {b.tier}")
+            w = _ev_warn(b.ev)
+            if w:
+                c[0].warning(w)
             with c[1]:
                 _bet_controls(desc, b.odd, "premium")
 
@@ -494,7 +507,9 @@ def _tab_strategy(rep, state) -> None:
             desc = f"{b.match} · {describe_pick(b.match, b.market, b.selection)}"
             with st.container(border=True):
                 c = st.columns([4, 1.4, 1.4])
-                c[0].markdown(f"**{b.match}**  \n👉 {describe_pick(b.match, b.market, b.selection)}")
+                w = _ev_warn(b.ev)
+                c[0].markdown(f"**{b.match}**  \n👉 {describe_pick(b.match, b.market, b.selection)}"
+                              + (f"  \n:orange[{w}]" if w else ""))
                 c[1].markdown(f"Cuota **{b.odd}**  \nEV +{b.ev:.1%} · conf {b.confidence:.0f}")
                 with c[2]:
                     _bet_controls(desc, b.odd, f"t{i}")
@@ -519,6 +534,9 @@ def _tab_strategy(rep, state) -> None:
                         st.caption(f"• {describe_pick(leg.match, leg.market, leg.selection)} "
                                    f"@ {leg.odd}")
                     st.metric("Cuota total", f"{p.total_odd:.2f}", f"EV +{p.ev:.0%} · {p.risk}")
+                    w = _ev_warn(p.ev)
+                    if w:
+                        st.caption(f":orange[{w}]")
                     legs = " + ".join(describe_pick(l.match, l.market, l.selection) for l in p.legs)
                     _bet_controls(f"Combinada {p.name}: {legs}", p.total_odd, f"combo_{p.name}")
 

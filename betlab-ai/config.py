@@ -91,6 +91,9 @@ class Settings:
     # --- Value Bet Engine ---------------------------------------------------
     # EV mínimo para considerar una apuesta de valor (5% -> 0.05).
     min_ev: float = field(default_factory=lambda: _get_float("MIN_EV", 0.05))
+    # EV por encima del cual el pick se marca "poco fiable" (EV inflado, típico
+    # de datos escasos / torneos de selecciones como el Mundial).
+    ev_warn: float = field(default_factory=lambda: _get_float("EV_WARN", 0.30))
     # Score de confianza mínimo (0-100) para mostrar una apuesta.
     # 80 => Value Pick (80-84), Strong (85-89) y Elite (90-100).
     min_confidence: float = field(default_factory=lambda: _get_float("MIN_CONFIDENCE", 80.0))

@@ -112,6 +112,11 @@ def _model_prob(model: PoissonModel, market: str, selection: str) -> float | Non
             line = float(market.split("_", 1)[1])
         except ValueError:
             return None
+        # Solo líneas .5 (sin "push" ni cuartos): ahí el modelo es exacto.
+        # Se descartan .0 (enteras, con empate de hándicap) y .25/.75 (cuartos),
+        # que requieren reembolsos/medios y se sobrevaloraban.
+        if round(abs(line) % 1, 2) != 0.5:
+            return None
         if selection in ("HOME", "AWAY"):
             return model.prob_handicap(selection, line)
         return None

@@ -31,7 +31,9 @@ from database import init_db, session, upsert
 
 SEED = 42
 LEAGUE_AVG_GOALS = 1.4
-TODAY = datetime(2026, 6, 20)
+# "Hoy" del demo = fecha real, para que los partidos por jugar siempre sean
+# de hoy en adelante (y no queden filtrados por ser fecha pasada).
+TODAY = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
 # id, nombre, país, abreviatura, sesgo de mercado, "trampa", nº equipos
 # market_bias>0 => cuotas generosas (apostar da ventaja).

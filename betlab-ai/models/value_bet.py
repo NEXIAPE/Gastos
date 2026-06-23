@@ -72,6 +72,11 @@ def _best_odds() -> pd.DataFrame:
 
 
 def _pending_fixtures() -> pd.DataFrame:
+    # Solo partidos POR JUGAR de hoy en adelante. Excluye los que ya se jugaron
+    # aunque la fuente aún no haya cargado el resultado (quedan como 'NS' con
+    # fecha pasada): así no aparece, p.ej., un Portugal que ya jugó.
+    from datetime import date as _date
+    today = _date.today().isoformat()
     sql = """
         SELECT f.id AS fixture_id, f.match_date, f.league_id,
                f.home_team_id, f.away_team_id,
@@ -82,10 +87,10 @@ def _pending_fixtures() -> pd.DataFrame:
         JOIN teams th ON th.id = f.home_team_id
         JOIN teams ta ON ta.id = f.away_team_id
         LEFT JOIN leagues lg ON lg.id = f.league_id
-        WHERE f.status = 'NS'
+        WHERE f.status = 'NS' AND substr(f.match_date, 1, 10) >= ?
         ORDER BY f.match_date
     """
-    return query_df(sql)
+    return query_df(sql, [today])
 
 
 def _model_prob(model: PoissonModel, market: str, selection: str) -> float | None:

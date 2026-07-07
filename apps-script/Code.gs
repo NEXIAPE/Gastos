@@ -22,6 +22,11 @@ function cfg(key, fallback) {
 var ENDPOINT_URL = cfg('ENDPOINT_URL', 'https://<PROJECT_REF>.supabase.co/functions/v1/ingest');
 var INGEST_TOKEN = cfg('INGEST_TOKEN', 'PEGA_TU_TOKEN_AQUI');
 
+// Para el correo-resumen diario de gastos sin categoría:
+var DIGEST_TOKEN  = cfg('DIGEST_TOKEN', 'PEGA_TU_DIGEST_TOKEN');
+var DASHBOARD_URL = cfg('DASHBOARD_URL', 'https://gastos-two-tau.vercel.app');
+var FUNCTIONS_BASE = ENDPOINT_URL.replace(/\/ingest\/?$/, ''); // .../functions/v1
+
 var LABEL_IN   = 'Consumos';            // etiqueta de entrada
 var LABEL_DONE = 'Consumos/Procesado';  // se aplica tras POST 2xx
 var LABEL_ERR  = 'Consumos/Error';      // no se pudo parsear (revisar plantilla)
@@ -351,4 +356,63 @@ function installTrigger() {
   }
   ScriptApp.newTrigger('processConsumos').timeBased().everyMinutes(15).create();
   Logger.log('Trigger instalado: processConsumos cada 15 min.');
+}
+
+// ===================== CORREO-RESUMEN DIARIO (categorizar de 1 toque) =====================
+// Categorías que se ofrecen como botones en el correo (las más usadas a mano).
+var DIGEST_CATS = [
+  'Comer fuera', 'Delivery', 'Antojos', 'Salidas', 'Mercado/minimarket',
+  'Transporte', 'Compras personales', 'Hogar', 'Servicios', 'Salud', 'Luna', 'Otros',
+];
+
+function dailyDigest() {
+  var resp = UrlFetchApp.fetch(
+    FUNCTIONS_BASE + '/pending?token=' + encodeURIComponent(DIGEST_TOKEN),
+    { muteHttpExceptions: true },
+  );
+  if (resp.getResponseCode() !== 200) {
+    Logger.log('pending error ' + resp.getResponseCode() + ' ' + resp.getContentText());
+    return;
+  }
+  var pending = (JSON.parse(resp.getContentText()).pending) || [];
+  if (pending.length === 0) { Logger.log('Sin pendientes; no se envía correo.'); return; }
+
+  var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:auto;color:#2b2b3a">';
+  html += '<h2 style="margin:0 0 4px">💸 Tienes ' + pending.length + ' gasto(s) sin categorizar</h2>';
+  html += '<p style="color:#8b8b9e;margin:0 0 14px">Toca una categoría en cada uno para clasificarlo al instante.</p>';
+
+  for (var i = 0; i < pending.length; i++) {
+    var p = pending[i];
+    var monto = 'S/ ' + Number(p.amount_pen || 0).toFixed(2);
+    var fecha = Utilities.formatDate(new Date(p.occurred_at), 'America/Lima', 'dd/MM HH:mm');
+    var name = p.merchant_clean || p.merchant_raw || '(sin nombre)';
+    html += '<div style="border:1px solid #ececf3;border-radius:14px;padding:12px 14px;margin:10px 0">';
+    html += '<div style="font-weight:700;font-size:15px">' + name + ' · ' + monto + '</div>';
+    html += '<div style="color:#8b8b9e;font-size:12px;margin-bottom:8px">' + fecha + '</div>';
+    for (var j = 0; j < DIGEST_CATS.length; j++) {
+      var cat = DIGEST_CATS[j];
+      var link = FUNCTIONS_BASE + '/quick-categorize?id=' + encodeURIComponent(p.id) +
+        '&cat=' + encodeURIComponent(cat) + '&token=' + encodeURIComponent(DIGEST_TOKEN);
+      html += '<a href="' + link + '" style="display:inline-block;margin:3px;padding:6px 11px;' +
+        'background:#efecfd;color:#6c5ce7;border-radius:999px;text-decoration:none;font-size:13px">' + cat + '</a>';
+    }
+    html += '</div>';
+  }
+  html += '<p style="margin-top:16px"><a href="' + DASHBOARD_URL + '" style="color:#6c5ce7">Abrir dashboard →</a></p></div>';
+
+  var to = Session.getActiveUser().getEmail();
+  GmailApp.sendEmail(to, '💸 ' + pending.length + ' gasto(s) por categorizar',
+    'Abre este correo en tu iPhone para categorizar tus gastos con un toque.',
+    { htmlBody: html, name: 'Gastos' });
+  Logger.log('Resumen enviado a ' + to + ' con ' + pending.length + ' pendientes.');
+}
+
+// Ejecuta UNA vez para programar el resumen diario (por defecto 9pm).
+function installDailyDigest() {
+  var trs = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < trs.length; i++) {
+    if (trs[i].getHandlerFunction() === 'dailyDigest') ScriptApp.deleteTrigger(trs[i]);
+  }
+  ScriptApp.newTrigger('dailyDigest').timeBased().atHour(21).everyDays(1).create();
+  Logger.log('Resumen diario instalado (~9pm, zona horaria del proyecto).');
 }

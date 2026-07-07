@@ -11,3 +11,11 @@ verify_jwt = false
 # Se invoca con el JWT del usuario logueado (dashboard) o con el service_role
 # key (cron). Ambos son JWT válidos.
 verify_jwt = true
+
+[functions.pending]
+# El Apps Script lo llama con DIGEST_TOKEN (no JWT de Supabase).
+verify_jwt = false
+
+[functions.quick-categorize]
+# Enlaces de 1 toque desde el correo, protegidos con DIGEST_TOKEN.
+verify_jwt = false

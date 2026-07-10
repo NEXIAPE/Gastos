@@ -381,6 +381,7 @@ function dailyDigest() {
   var digestCats = (payload.categories && payload.categories.length) ? payload.categories : DIGEST_CATS_FALLBACK;
   Logger.log('Pendientes: ' + pending.length + ' | Categorías recibidas: ' + (payload.categories ? payload.categories.length : 0) +
     (digestCats === DIGEST_CATS_FALLBACK ? ' (usando fallback de 12 — revisa que /pending esté desplegado y con la tabla categories)' : ''));
+  if (payload.categories_error) Logger.log('Error al leer categories: ' + payload.categories_error);
   if (pending.length === 0) { Logger.log('Sin pendientes; no se envía correo.'); return; }
 
   // Emoji vía código Unicode (evita el mojibake visto en Mail/Gmail al

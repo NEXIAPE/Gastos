@@ -43,5 +43,8 @@ Deno.serve(async (req) => {
   return json({
     pending: txns.data ?? [],
     categories: (cats.data ?? []).map((c: { name: string }) => c.name),
+    // Diagnóstico: si categories viene vacío por un error real (no porque la
+    // tabla esté vacía), aquí se ve la causa en vez de fallar en silencio.
+    categories_error: cats.error ? cats.error.message : undefined,
   });
 });

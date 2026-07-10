@@ -359,8 +359,10 @@ function installTrigger() {
 }
 
 // ===================== CORREO-RESUMEN DIARIO (categorizar de 1 toque) =====================
-// Categorías que se ofrecen como botones en el correo (las más usadas a mano).
-var DIGEST_CATS = [
+// Respaldo si el endpoint /pending no devuelve categorías (p.ej. versión vieja
+// desplegada). Normalmente se usan TODAS las categorías reales (tabla
+// `categories`, editable desde Ajustes → Categorías en el dashboard).
+var DIGEST_CATS_FALLBACK = [
   'Comer fuera', 'Delivery', 'Antojos', 'Salidas', 'Mercado/minimarket',
   'Transporte', 'Compras personales', 'Hogar', 'Servicios', 'Salud', 'Luna', 'Otros',
 ];
@@ -374,7 +376,9 @@ function dailyDigest() {
     Logger.log('pending error ' + resp.getResponseCode() + ' ' + resp.getContentText());
     return;
   }
-  var pending = (JSON.parse(resp.getContentText()).pending) || [];
+  var payload = JSON.parse(resp.getContentText());
+  var pending = payload.pending || [];
+  var digestCats = (payload.categories && payload.categories.length) ? payload.categories : DIGEST_CATS_FALLBACK;
   if (pending.length === 0) { Logger.log('Sin pendientes; no se envía correo.'); return; }
 
   var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:auto;color:#2b2b3a">';
@@ -389,8 +393,8 @@ function dailyDigest() {
     html += '<div style="border:1px solid #ececf3;border-radius:14px;padding:12px 14px;margin:10px 0">';
     html += '<div style="font-weight:700;font-size:15px">' + name + ' · ' + monto + '</div>';
     html += '<div style="color:#8b8b9e;font-size:12px;margin-bottom:8px">' + fecha + '</div>';
-    for (var j = 0; j < DIGEST_CATS.length; j++) {
-      var cat = DIGEST_CATS[j];
+    for (var j = 0; j < digestCats.length; j++) {
+      var cat = digestCats[j];
       var link = FUNCTIONS_BASE + '/quick-categorize?id=' + encodeURIComponent(p.id) +
         '&cat=' + encodeURIComponent(cat) + '&token=' + encodeURIComponent(DIGEST_TOKEN);
       html += '<a href="' + link + '" style="display:inline-block;margin:3px;padding:6px 11px;' +

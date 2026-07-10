@@ -23,16 +23,25 @@ Deno.serve(async (req) => {
   const days = Number(url.searchParams.get("days") ?? "12");
   const since = new Date(Date.now() - days * 86400_000).toISOString();
 
-  const { data, error } = await admin
-    .from("transactions")
-    .select("id, merchant_clean, merchant_raw, amount_pen, occurred_at, channel")
-    .eq("category", "Sin categoría")
-    .eq("direction", "out")
-    .neq("status", "declined")
-    .gte("occurred_at", since)
-    .order("occurred_at", { ascending: false })
-    .limit(50);
+  const [txns, cats] = await Promise.all([
+    admin.from("transactions")
+      .select("id, merchant_clean, merchant_raw, amount_pen, occurred_at, channel")
+      .eq("category", "Sin categoría")
+      .eq("direction", "out")
+      .neq("status", "declined")
+      .gte("occurred_at", since)
+      .order("occurred_at", { ascending: false })
+      .limit(50),
+    admin.from("categories")
+      .select("name")
+      .neq("name", "Sin categoría")
+      .order("expense_group")
+      .order("name"),
+  ]);
 
-  if (error) return json({ error: "query_failed", detail: error.message }, 500);
-  return json({ pending: data ?? [] });
+  if (txns.error) return json({ error: "query_failed", detail: txns.error.message }, 500);
+  return json({
+    pending: txns.data ?? [],
+    categories: (cats.data ?? []).map((c: { name: string }) => c.name),
+  });
 });

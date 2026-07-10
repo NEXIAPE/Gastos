@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchNeedsReview, fetchTransactions, type TxnFilters } from "../lib/queries";
-import { CATEGORIES, CHANNELS, CHANNEL_LABEL, DIRECTIONS, STATUSES } from "../lib/types";
+import { CHANNELS, CHANNEL_LABEL, DIRECTIONS, STATUSES } from "../lib/types";
+import { useCategories } from "../lib/categories";
 import { localInputToLimaIso } from "../lib/time";
 import { soles } from "../lib/format";
 import { sumPen } from "../lib/aggregate";
@@ -12,6 +13,7 @@ type Tab = "todas" | "revisar" | "recibido";
 const TABS: [Tab, string][] = [["todas", "Todas"], ["revisar", "Por revisar"], ["recibido", "Recibido"]];
 
 export default function Transacciones() {
+  const { names: categoryNames } = useCategories();
   const [tab, setTab] = useState<Tab>("todas");
   const [rows, setRows] = useState<Transaction[]>([]);
   const [merchant, setMerchant] = useState("");
@@ -60,7 +62,7 @@ export default function Transacciones() {
             <input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="buscar…" /></div>
           <div className="field"><label>Categoría</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">Todas</option>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+              <option value="">Todas</option>{categoryNames.map((c) => <option key={c}>{c}</option>)}
             </select></div>
           <div className="field"><label>Canal</label>
             <select value={channel} onChange={(e) => setChannel(e.target.value)}>

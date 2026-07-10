@@ -1,5 +1,6 @@
 import type { Transaction } from "./types";
-import { type ExpenseGroup, groupOf } from "./types";
+import type { ExpenseGroup } from "./types";
+import { groupOf } from "./categories";
 
 export const sumPen = (rows: { amount_pen: number | null }[]): number =>
   Number(rows.reduce((a, r) => a + (r.amount_pen ?? 0), 0).toFixed(2));

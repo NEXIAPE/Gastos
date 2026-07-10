@@ -4,7 +4,8 @@ import {
   getFxRate, insertManual, setFxRate,
 } from "../lib/queries";
 import { supabase } from "../lib/supabase";
-import { CATEGORIES, CHANNELS, CHANNEL_LABEL, type CategoryRule } from "../lib/types";
+import { CHANNELS, CHANNEL_LABEL, EXPENSE_GROUPS, type CategoryRule, type ExpenseGroup } from "../lib/types";
+import { addCategory, deleteCategory, useCategories } from "../lib/categories";
 import { localInputToLimaIso } from "../lib/time";
 import { parseCsv } from "../lib/csv";
 
@@ -13,12 +14,67 @@ export default function Ajustes() {
     <>
       <h1 className="page">Ajustes</h1>
       <FxCard />
+      <CategoriesCard />
       <ManualCard />
       <RulesCard />
       <BulkCard />
       <ImportCard />
       <DangerCard />
     </>
+  );
+}
+
+function CategoriesCard() {
+  const { categories, loading, reload } = useCategories();
+  const [name, setName] = useState("");
+  const [group, setGroup] = useState<ExpenseGroup>("Lifestyle");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function add() {
+    if (!name.trim()) return;
+    setMsg(null);
+    try {
+      await addCategory(name, group);
+      setName("");
+      setMsg("Agregada ✓");
+    } catch (e) { setMsg(String(e)); }
+  }
+
+  async function remove(cat: string) {
+    if (!confirm(`¿Borrar la categoría "${cat}"? Las transacciones que ya la tienen la conservan como texto.`)) return;
+    try { await deleteCategory(cat); } catch (e) { setMsg(String(e)); }
+  }
+
+  return (
+    <div className="card">
+      <h2>Categorías</h2>
+      <p className="muted">Agrega las categorías que necesites; aparecen al toque en toda la app y en el correo diario.</p>
+      <div className="row" style={{ alignItems: "flex-end" }}>
+        <div className="field"><label>Nueva categoría</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej. Belleza" /></div>
+        <div className="field"><label>Tipo de gasto</label>
+          <select value={group} onChange={(e) => setGroup(e.target.value as ExpenseGroup)}>
+            {EXPENSE_GROUPS.map((g) => <option key={g}>{g}</option>)}</select></div>
+        <button className="primary" onClick={add}>Añadir</button>
+        {msg && <span className="muted">{msg}</span>}
+      </div>
+      {!loading && (
+        <div className="row" style={{ gap: 6, marginTop: 12 }}>
+          {categories.map((c) => (
+            <span key={c.name} className="badge">
+              {c.name}
+              {c.name !== "Sin categoría" && (
+                <button className="link" style={{ marginLeft: 6, fontSize: 11 }} onClick={() => remove(c.name)}>✕</button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+        {loading ? "Cargando…" : `${categories.length} categorías`}
+        {" · "}<button className="link" onClick={() => reload()}>refrescar</button>
+      </p>
+    </div>
   );
 }
 
@@ -43,6 +99,7 @@ function FxCard() {
 }
 
 function ManualCard() {
+  const { names: categoryNames } = useCategories();
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("PEN");
@@ -96,7 +153,7 @@ function ManualCard() {
             {CHANNELS.map((c) => <option key={c} value={c}>{CHANNEL_LABEL[c]}</option>)}</select></div>
         <div className="field"><label>Categoría</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></div>
+            {categoryNames.map((c) => <option key={c}>{c}</option>)}</select></div>
         <div className="field"><label>Fecha/hora</label>
           <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
       </div>
@@ -109,6 +166,7 @@ function ManualCard() {
 }
 
 function RulesCard() {
+  const { names: categoryNames } = useCategories();
   const [rules, setRules] = useState<CategoryRule[]>([]);
   const [match, setMatch] = useState("");
   const [category, setCategory] = useState("Sin categoría");
@@ -124,7 +182,7 @@ function RulesCard() {
           <input value={match} onChange={(e) => setMatch(e.target.value)} placeholder="RAPPI" /></div>
         <div className="field"><label>Categoría</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></div>
+            {categoryNames.map((c) => <option key={c}>{c}</option>)}</select></div>
         <div className="field"><label>Prioridad</label>
           <input type="number" value={priority} style={{ width: 80 }}
             onChange={(e) => setPriority(e.target.value)} /></div>
@@ -151,6 +209,7 @@ function RulesCard() {
 }
 
 function BulkCard() {
+  const { names: categoryNames } = useCategories();
   const [match, setMatch] = useState("");
   const [category, setCategory] = useState("Sin categoría");
   const [msg, setMsg] = useState<string | null>(null);
@@ -163,7 +222,7 @@ function BulkCard() {
           <input value={match} onChange={(e) => setMatch(e.target.value)} placeholder="RAPPI" /></div>
         <div className="field"><label>Nueva categoría</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></div>
+            {categoryNames.map((c) => <option key={c}>{c}</option>)}</select></div>
         <button className="primary" onClick={async () => {
           if (!match.trim()) return;
           await bulkRecategorize(match.trim(), category); setMsg("Listo ✓"); setMatch("");

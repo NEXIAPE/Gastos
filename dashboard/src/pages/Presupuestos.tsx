@@ -3,7 +3,8 @@ import { deleteBudget, fetchBudgets, fetchSpend, fetchSpendSince, upsertBudget }
 import { limaMonthKey, sumByCategory } from "../lib/aggregate";
 import { currentLimaYearMonth, monthRange } from "../lib/time";
 import { soles } from "../lib/format";
-import { groupOf, GROUP_COLOR } from "../lib/types";
+import { GROUP_COLOR } from "../lib/types";
+import { groupOf } from "../lib/categories";
 import type { Budget, Transaction } from "../lib/types";
 
 export default function Presupuestos() {

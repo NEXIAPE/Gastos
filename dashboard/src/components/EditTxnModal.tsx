@@ -1,11 +1,13 @@
 import { useState } from "react";
 import type { Transaction } from "../lib/types";
-import { CATEGORIES, CHANNELS, CHANNEL_LABEL, DIRECTIONS, STATUSES } from "../lib/types";
+import { CHANNELS, CHANNEL_LABEL, DIRECTIONS, STATUSES } from "../lib/types";
+import { useCategories } from "../lib/categories";
 import { addRule, deleteTransaction, updateTransaction } from "../lib/queries";
 
 export default function EditTxnModal({
   txn, onClose, onSaved,
 }: { txn: Transaction; onClose: () => void; onSaved: () => void }) {
+  const { names: categoryNames } = useCategories();
   const [category, setCategory] = useState(txn.category);
   const [direction, setDirection] = useState(txn.direction);
   const [status, setStatus] = useState(txn.status);
@@ -63,7 +65,7 @@ export default function EditTxnModal({
           <div className="field" style={{ flex: 1 }}>
             <label>Categoría</label>
             <select value={category} style={{ width: "100%" }} onChange={(e) => setCategory(e.target.value)}>
-              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+              {categoryNames.map((c) => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div className="field" style={{ flex: 1 }}>

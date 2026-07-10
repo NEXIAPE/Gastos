@@ -384,11 +384,13 @@ function dailyDigest() {
   if (payload.categories_error) Logger.log('Error al leer categories: ' + payload.categories_error);
   if (pending.length === 0) { Logger.log('Sin pendientes; no se envía correo.'); return; }
 
-  // Emoji vía código Unicode (evita el mojibake visto en Mail/Gmail al
-  // copiar/pegar el script entre editores con distinta codificación).
-  var MONEY_EMOJI = String.fromCharCode(0xD83D, 0xDCB8); // 💸
+  // GmailApp.sendEmail tiene un bug conocido con emojis "astrales" (fuera del
+  // plano básico, como 💸): se corrompen aunque el código esté bien escrito.
+  // En el CUERPO (HTML) usamos la referencia numérica &#x1F4B8; — la decodifica
+  // el cliente de correo, no Apps Script, así que es inmune a ese bug.
+  var MONEY_EMOJI_HTML = '&#x1F4B8;'; // 💸, solo para el cuerpo HTML
   var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:auto;color:#2b2b3a">';
-  html += '<h2 style="margin:0 0 4px">' + MONEY_EMOJI + ' Tienes ' + pending.length + ' gasto(s) sin categorizar</h2>';
+  html += '<h2 style="margin:0 0 4px">' + MONEY_EMOJI_HTML + ' Tienes ' + pending.length + ' gasto(s) sin categorizar</h2>';
   html += '<p style="color:#8b8b9e;margin:0 0 14px">Toca una categoría en cada uno para clasificarlo al instante.</p>';
 
   for (var i = 0; i < pending.length; i++) {
@@ -410,8 +412,11 @@ function dailyDigest() {
   }
   html += '<p style="margin-top:16px"><a href="' + DASHBOARD_URL + '" style="color:#6c5ce7">Abrir dashboard →</a></p></div>';
 
+  // El asunto es texto plano (sin HTML): no admite &#x1F4B8;, y el emoji
+  // literal es justo lo que falla ahí. Lo dejamos sin emoji para que sea 100%
+  // confiable.
   var to = Session.getActiveUser().getEmail();
-  GmailApp.sendEmail(to, MONEY_EMOJI + ' ' + pending.length + ' gasto(s) por categorizar',
+  GmailApp.sendEmail(to, pending.length + ' gasto(s) por categorizar',
     'Abre este correo en tu iPhone para categorizar tus gastos con un toque.',
     { htmlBody: html, name: 'Gastos' });
   Logger.log('Resumen enviado a ' + to + ' con ' + pending.length + ' pendientes.');

@@ -129,6 +129,17 @@ export async function setFxRate(rate: number): Promise<void> {
   if (error) throw error;
 }
 
+// ---- Settings (nombres propios, para detectar transferencias a mí mismo) ----
+export async function getSelfNames(): Promise<string[]> {
+  const { data } = await supabase.from("settings").select("value").eq("key", "self_names").maybeSingle();
+  return Array.isArray(data?.value) ? (data!.value as unknown[]).map((v) => String(v)) : [];
+}
+export async function setSelfNames(names: string[]): Promise<void> {
+  const { error } = await supabase.from("settings")
+    .upsert({ key: "self_names", value: names, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
 // ---- Presupuestos (fase 2) ----
 export async function fetchBudgets(): Promise<Budget[]> {
   const { data, error } = await supabase.from("budgets").select("*");

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   addRule, bulkRecategorize, deleteAllTransactions, deleteRule, fetchRules,
-  getFxRate, insertManual, setFxRate,
+  getFxRate, getSelfNames, insertManual, setFxRate, setSelfNames,
 } from "../lib/queries";
 import { supabase } from "../lib/supabase";
 import { CHANNELS, CHANNEL_LABEL, EXPENSE_GROUPS, type CategoryRule, type ExpenseGroup } from "../lib/types";
@@ -14,6 +14,7 @@ export default function Ajustes() {
     <>
       <h1 className="page">Ajustes</h1>
       <FxCard />
+      <SelfNamesCard />
       <CategoriesCard />
       <ManualCard />
       <RulesCard />
@@ -91,6 +92,34 @@ function FxCard() {
           <input type="number" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} /></div>
         <button className="primary" onClick={async () => {
           await setFxRate(Number(rate)); setSaved(true); setTimeout(() => setSaved(false), 1500);
+        }}>Guardar</button>
+        {saved && <span className="pos">Guardado</span>}
+      </div>
+    </div>
+  );
+}
+
+function SelfNamesCard() {
+  const [names, setNames] = useState("");
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { getSelfNames().then((n) => setNames(n.join(", "))); }, []);
+  return (
+    <div className="card">
+      <h2>Mis nombres (transferencias a mí mismo)</h2>
+      <p className="muted">
+        Cuando un Yape/Plin llega a uno de estos nombres (ej. tu propio Plin), se marca como
+        transferencia y no cuenta como gasto. Sepáralos por coma; usa el nombre tal como
+        aparece en tus correos (ej. "Juana Perez").
+      </p>
+      <div className="row" style={{ alignItems: "flex-end" }}>
+        <div className="field" style={{ flex: 1 }}>
+          <label>Nombres / alias</label>
+          <input value={names} style={{ width: "100%" }} onChange={(e) => setNames(e.target.value)}
+            placeholder="Tu Nombre Apellido, Apodo" />
+        </div>
+        <button className="primary" onClick={async () => {
+          await setSelfNames(names.split(",").map((n) => n.trim()).filter(Boolean));
+          setSaved(true); setTimeout(() => setSaved(false), 1500);
         }}>Guardar</button>
         {saved && <span className="pos">Guardado</span>}
       </div>

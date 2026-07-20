@@ -24,7 +24,7 @@ var INGEST_TOKEN = cfg('INGEST_TOKEN', 'PEGA_TU_TOKEN_AQUI');
 
 // Para el correo-resumen diario de gastos sin categoría:
 var DIGEST_TOKEN  = cfg('DIGEST_TOKEN', 'PEGA_TU_DIGEST_TOKEN');
-var DASHBOARD_URL = cfg('DASHBOARD_URL', 'https://gastos-two-tau.vercel.app');
+var DASHBOARD_URL = cfg('DASHBOARD_URL', 'https://TU-DASHBOARD.vercel.app');
 var FUNCTIONS_BASE = ENDPOINT_URL.replace(/\/ingest\/?$/, ''); // .../functions/v1
 
 var LABEL_IN   = 'Consumos';            // etiqueta de entrada
@@ -238,8 +238,8 @@ var TEMPLATES = {
   },
 
   // -------------------- PLIN (vía alerta del banco BCP/Interbank) --------------------
-  // Muestra real BCP: "...con tu Tarjeta de Débito BCP en PLIN-Alessandra Sanche",
-  // "Empresa  PLIN-Alessandra Sanche", "Número de operación  741981".
+  // Muestra real BCP: "...con tu Tarjeta de Débito BCP en PLIN-Nombre Apellido",
+  // "Empresa  PLIN-Nombre Apellido", "Número de operación  741981".
   plin: function (body, subject, date, messageId, bank) {
     var amountM = firstMatch(body, AMOUNT_RE);
     var who = firstMatch(body, [

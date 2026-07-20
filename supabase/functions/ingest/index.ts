@@ -58,13 +58,12 @@ async function getFxRate(): Promise<number> {
 }
 
 // Nombres/alias propios del usuario. Si la contraparte coincide, el movimiento
-// es una transferencia a sí mismo (no es gasto). Editable desde la tabla
-// `settings` (clave 'self_names', un array JSON) sin redeploy.
-const SELF_NAMES_DEFAULT = ["ALESSANDRA SANCHE", "ALESSANDRA SANCHEZ", "ALES SANCHEZ"];
+// es una transferencia a sí mismo (no es gasto). 100% configurable desde el
+// dashboard (Ajustes → "Mis nombres"), sin nada hardcodeado ni redeploy.
 async function getSelfNames(): Promise<string[]> {
   const { data } = await admin.from("settings").select("value").eq("key", "self_names").maybeSingle();
-  const extra = Array.isArray(data?.value) ? (data!.value as unknown[]).map((x) => String(x)) : [];
-  return [...new Set([...SELF_NAMES_DEFAULT, ...extra].map((s) => s.toUpperCase().trim()))].filter(Boolean);
+  const names = Array.isArray(data?.value) ? (data!.value as unknown[]).map((x) => String(x)) : [];
+  return [...new Set(names.map((s) => s.toUpperCase().trim()))].filter(Boolean);
 }
 
 async function getRules(): Promise<CategoryRule[]> {

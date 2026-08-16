@@ -11,6 +11,11 @@ import Presupuestos from "./pages/Presupuestos";
 import Insights from "./pages/Insights";
 import Ajustes from "./pages/Ajustes";
 
+// ⚠️ TEMPORAL: login desactivado a pedido explícito (sin acceso al correo del
+// enlace mágico). El dashboard queda accesible por link a cualquiera mientras
+// esto sea `false`. Vuelve a poner `true` en cuanto tengas acceso a tu correo.
+const REQUIRE_LOGIN = false;
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
@@ -25,7 +30,7 @@ export default function App() {
   }, []);
 
   if (!ready) return <div className="center">Cargando…</div>;
-  if (!session) return <Auth />;
+  if (REQUIRE_LOGIN && !session) return <Auth />;
 
   return (
     <Routes>

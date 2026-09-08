@@ -3,6 +3,7 @@ import type { Transaction } from "../lib/types";
 import { CHANNEL_LABEL } from "../lib/types";
 import { soles } from "../lib/format";
 import { fmtDateTime } from "../lib/time";
+import { deleteTransaction } from "../lib/queries";
 import EditTxnModal from "./EditTxnModal";
 
 function StatusBadge({ t }: { t: Transaction }) {
@@ -15,8 +16,18 @@ function StatusBadge({ t }: { t: Transaction }) {
 
 export default function TxnTable({ rows, onChange }: { rows: Transaction[]; onChange: () => void }) {
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   if (rows.length === 0) return <p className="muted">No hay transacciones.</p>;
+
+  async function quickDelete(t: Transaction) {
+    const name = t.merchant_clean || t.merchant_raw || "esta transacción";
+    if (!confirm(`¿Borrar "${name}" (${soles(t.amount_pen)})?`)) return;
+    setBusyId(t.id);
+    try { await deleteTransaction(t.id); onChange(); }
+    catch (e) { alert(String(e)); }
+    finally { setBusyId(null); }
+  }
 
   return (
     <>
@@ -25,7 +36,7 @@ export default function TxnTable({ rows, onChange }: { rows: Transaction[]; onCh
         <thead>
           <tr>
             <th>Fecha</th><th>Comercio</th><th>Categoría</th><th>Canal</th>
-            <th className="num">Monto</th><th></th><th></th>
+            <th className="num">Monto</th><th></th><th></th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -44,6 +55,12 @@ export default function TxnTable({ rows, onChange }: { rows: Transaction[]; onCh
               </td>
               <td className="c-status"><StatusBadge t={t} /></td>
               <td className="c-edit"><button className="link" onClick={() => setEditing(t)}>editar</button></td>
+              <td className="c-delete">
+                <button className="link" style={{ color: "var(--danger)" }} disabled={busyId === t.id}
+                  onClick={() => quickDelete(t)}>
+                  {busyId === t.id ? "…" : "borrar"}
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>

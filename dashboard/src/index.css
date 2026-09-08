@@ -200,5 +200,8 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px
   .txntable .c-cat, .txntable .c-chan, .txntable .c-status { display: inline; font-size: 12px; color: var(--muted); }
   .txntable .c-chan::before { content: " · "; }
   .txntable .c-status:not(:empty) { margin-left: 6px; }
-  .txntable .c-edit { display: block; text-align: right; margin-top: 4px; }
+  .txntable .c-edit, .txntable .c-delete { display: inline-block; margin-top: 4px; }
+  .txntable .c-edit { float: left; }
+  .txntable .c-delete { float: right; }
+  .txntable tr::after { content: ""; display: block; clear: both; }
 }

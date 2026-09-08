@@ -5,9 +5,10 @@ import {
 } from "../lib/queries";
 import { supabase } from "../lib/supabase";
 import { CHANNELS, CHANNEL_LABEL, EXPENSE_GROUPS, type CategoryRule, type ExpenseGroup } from "../lib/types";
-import { addCategory, deleteCategory, useCategories } from "../lib/categories";
+import { addCategory, deleteCategory, groupedCategories, useCategories } from "../lib/categories";
 import { localInputToLimaIso } from "../lib/time";
 import { parseCsv } from "../lib/csv";
+import CategorySelect from "../components/CategorySelect";
 
 export default function Ajustes() {
   return (
@@ -59,18 +60,21 @@ function CategoriesCard() {
         <button className="primary" onClick={add}>Añadir</button>
         {msg && <span className="muted">{msg}</span>}
       </div>
-      {!loading && (
-        <div className="row" style={{ gap: 6, marginTop: 12 }}>
-          {categories.map((c) => (
-            <span key={c.name} className="badge">
-              {c.name}
-              {c.name !== "Sin categoría" && (
-                <button className="link" style={{ marginLeft: 6, fontSize: 11 }} onClick={() => remove(c.name)}>✕</button>
-              )}
-            </span>
-          ))}
+      {!loading && groupedCategories(categories).map(({ group, names }) => (
+        <div key={group} style={{ marginTop: 12 }}>
+          <div className="muted" style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{group}</div>
+          <div className="row" style={{ gap: 6 }}>
+            {names.map((name) => (
+              <span key={name} className="badge">
+                {name}
+                {name !== "Sin categoría" && (
+                  <button className="link" style={{ marginLeft: 6, fontSize: 11 }} onClick={() => remove(name)}>✕</button>
+                )}
+              </span>
+            ))}
+          </div>
         </div>
-      )}
+      ))}
       <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
         {loading ? "Cargando…" : `${categories.length} categorías`}
         {" · "}<button className="link" onClick={() => reload()}>refrescar</button>
@@ -128,7 +132,6 @@ function SelfNamesCard() {
 }
 
 function ManualCard() {
-  const { names: categoryNames } = useCategories();
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("PEN");
@@ -181,8 +184,7 @@ function ManualCard() {
           <select value={channel} onChange={(e) => setChannel(e.target.value)}>
             {CHANNELS.map((c) => <option key={c} value={c}>{CHANNEL_LABEL[c]}</option>)}</select></div>
         <div className="field"><label>Categoría</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {categoryNames.map((c) => <option key={c}>{c}</option>)}</select></div>
+          <CategorySelect value={category} onChange={setCategory} /></div>
         <div className="field"><label>Fecha/hora</label>
           <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
       </div>
@@ -195,7 +197,6 @@ function ManualCard() {
 }
 
 function RulesCard() {
-  const { names: categoryNames } = useCategories();
   const [rules, setRules] = useState<CategoryRule[]>([]);
   const [match, setMatch] = useState("");
   const [category, setCategory] = useState("Sin categoría");
@@ -210,8 +211,7 @@ function RulesCard() {
         <div className="field"><label>Texto en comercio</label>
           <input value={match} onChange={(e) => setMatch(e.target.value)} placeholder="RAPPI" /></div>
         <div className="field"><label>Categoría</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {categoryNames.map((c) => <option key={c}>{c}</option>)}</select></div>
+          <CategorySelect value={category} onChange={setCategory} /></div>
         <div className="field"><label>Prioridad</label>
           <input type="number" value={priority} style={{ width: 80 }}
             onChange={(e) => setPriority(e.target.value)} /></div>
@@ -238,7 +238,6 @@ function RulesCard() {
 }
 
 function BulkCard() {
-  const { names: categoryNames } = useCategories();
   const [match, setMatch] = useState("");
   const [category, setCategory] = useState("Sin categoría");
   const [msg, setMsg] = useState<string | null>(null);
@@ -250,8 +249,7 @@ function BulkCard() {
         <div className="field"><label>Comercio contiene</label>
           <input value={match} onChange={(e) => setMatch(e.target.value)} placeholder="RAPPI" /></div>
         <div className="field"><label>Nueva categoría</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {categoryNames.map((c) => <option key={c}>{c}</option>)}</select></div>
+          <CategorySelect value={category} onChange={setCategory} /></div>
         <button className="primary" onClick={async () => {
           if (!match.trim()) return;
           await bulkRecategorize(match.trim(), category); setMsg("Listo ✓"); setMatch("");

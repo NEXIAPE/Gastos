@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import type { ExpenseGroup } from "./types";
+import { EXPENSE_GROUPS, type ExpenseGroup } from "./types";
 
 export interface CategoryDef {
   name: string;
@@ -42,6 +42,22 @@ export function fetchCategories(force = false): Promise<CategoryDef[]> {
 
 /** Tipo de Gasto de una categoría (síncrono, usa la caché en memoria). */
 export const groupOf = (cat: string): ExpenseGroup => groupMap[cat] ?? "Otros";
+
+/**
+ * Agrupa categorías por Tipo de Gasto, en el orden canónico (Fijo → Otros) en
+ * vez del orden alfabético en que las devuelve la base de datos. Base para
+ * cualquier selector/lista que quiera mostrarlas organizadas por tipo.
+ */
+export function groupedCategories(categories: CategoryDef[]): { group: ExpenseGroup; names: string[] }[] {
+  const byGroup = new Map<ExpenseGroup, string[]>();
+  for (const c of categories) {
+    if (!byGroup.has(c.expense_group)) byGroup.set(c.expense_group, []);
+    byGroup.get(c.expense_group)!.push(c.name);
+  }
+  return EXPENSE_GROUPS
+    .map((group) => ({ group, names: (byGroup.get(group) ?? []).sort() }))
+    .filter((g) => g.names.length > 0);
+}
 
 export async function addCategory(name: string, group: ExpenseGroup): Promise<void> {
   const clean = name.trim();

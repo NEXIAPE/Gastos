@@ -215,9 +215,12 @@ var TEMPLATES = {
     var isIn = /te yapearon|recibiste un yape|monto recibido|yapeo recibido|abono a tu cuenta|ingreso a tu cuenta|te deposit/.test(t);
     var direction = isOut ? 'out' : (isIn ? 'in' : null);
     var amountM = firstMatch(body, [/Monto\s+(?:enviado|recibido):?\s*S\/\.?\s*([\d.,]+)/i]) || firstMatch(body, AMOUNT_RE);
+    // Captura no-ávida hasta 2+ espacios seguidos o fin de línea: si el correo
+    // trae varios campos en la misma línea ("Enviado a NOMBRE   Destino Yape"),
+    // no se traga el siguiente campo.
     var who = firstMatch(body, [
-      /Enviado a\s+([A-ZÁÉÍÓÚÑ][^\n\r]{2,50})/i,
-      /Recibido de\s+([A-ZÁÉÍÓÚÑ][^\n\r]{2,50})/i,
+      /Enviado a\s+([A-ZÁÉÍÓÚÑ][^\n\r]+?)(?=\s{2,}|[\r\n]|$)/i,
+      /Recibido de\s+([A-ZÁÉÍÓÚÑ][^\n\r]+?)(?=\s{2,}|[\r\n]|$)/i,
       /(?:a|para)\s+([A-ZÁÉÍÓÚÑ][\w .'-]{2,40})/,
     ]);
     var voucher = firstMatch(body, VOUCHER_RE);
@@ -243,8 +246,8 @@ var TEMPLATES = {
   plin: function (body, subject, date, messageId, bank) {
     var amountM = firstMatch(body, AMOUNT_RE);
     var who = firstMatch(body, [
-      /Empresa\s+([^\n\r]+)/i,
-      /\ben\s+(PLIN[-\s][^\n\r.]+)/i,
+      /Empresa\s+([^\n\r]+?)(?=\s{2,}|[\r\n]|$)/i,
+      /\ben\s+(PLIN[-\s][^\n\r.]+?)(?=\s{2,}|[\r\n]|$)/i,
     ]);
     var voucher = firstMatch(body, VOUCHER_RE);
     return {
@@ -269,8 +272,8 @@ var TEMPLATES = {
   pagoAutomatico: function (body, subject, date, messageId) {
     var amountM = firstMatch(body, [/Monto\s+cobrado:?\s*S\/\.?\s*([\d.,]+)/i]) || firstMatch(body, AMOUNT_RE);
     var merch = firstMatch(body, [
-      /Empresa:?\s*\d*\s*-\s*([^\n\r]+)/i,
-      /Servicio:?\s*\d*\s*-\s*([^\n\r]+)/i,
+      /Empresa:?\s*\d*\s*-\s*([^\n\r]+?)(?=\s{2,}|[\r\n]|$)/i,
+      /Servicio:?\s*\d*\s*-\s*([^\n\r]+?)(?=\s{2,}|[\r\n]|$)/i,
     ]);
     return {
       source: 'email_interbank',
@@ -291,9 +294,11 @@ var TEMPLATES = {
   // Muestra real: "Comercio: OXXO TAMAYO", "Monto: S/. 3.90", "Tarjeta: ****9251".
   interbank: function (body, subject, date, messageId) {
     var amountM = firstMatch(body, AMOUNT_RE);
+    // Solo "Comercio:" — se quitó el respaldo genérico "en <MAYÚSCULAS>" que
+    // a veces atrapaba texto del pie de página legal ("... en tu Interbank
+    // APP", etc.) en vez del comercio real. Sin "Comercio:", usa el asunto.
     var merch = firstMatch(body, [
-      /Comercio:\s*([^\n\r]+)/i,
-      /\ben\s+([A-Z0-9][\w &.'*\/-]{2,40})/,
+      /Comercio:\s*([^\n\r]+?)(?=\s{2,}|[\r\n]|$)/i,
     ]);
     var card = firstMatch(body, CARD_RE);
     var voucher = firstMatch(body, VOUCHER_RE);
@@ -316,10 +321,11 @@ var TEMPLATES = {
   // Muestra real: "Realizaste un consumo de S/ 10.00 con tu Tarjeta de Débito BCP en <COMERCIO>".
   bcp: function (body, subject, date, messageId) {
     var amountM = firstMatch(body, AMOUNT_RE);
+    // Se quitó el respaldo genérico "en <MAYÚSCULAS>" (mismo riesgo que en
+    // Interbank: podía capturar texto del pie de página legal).
     var merch = firstMatch(body, [
-      /Tarjeta de D[eé]bito BCP en\s+([^\n\r.]+)/i,
-      /Comercio:?\s*([^\n\r]+)/i,
-      /\ben\s+([A-Z0-9][\w &.'*\/-]{2,40})/,
+      /Tarjeta de D[eé]bito BCP en\s+([^\n\r.]+?)(?=\s{2,}|[\r\n]|\.|$)/i,
+      /Comercio:?\s*([^\n\r]+?)(?=\s{2,}|[\r\n]|$)/i,
     ]);
     var card = firstMatch(body, CARD_RE);
     var voucher = firstMatch(body, VOUCHER_RE);

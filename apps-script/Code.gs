@@ -358,14 +358,11 @@ function installTrigger() {
   Logger.log('Trigger instalado: processConsumos cada 15 min.');
 }
 
-// ===================== CORREO-RESUMEN DIARIO (categorizar de 1 toque) =====================
-// Respaldo si el endpoint /pending no devuelve categorías (p.ej. versión vieja
-// desplegada). Normalmente se usan TODAS las categorías reales (tabla
-// `categories`, editable desde Ajustes → Categorías en el dashboard).
-var DIGEST_CATS_FALLBACK = [
-  'Comer fuera', 'Delivery', 'Antojos', 'Salidas', 'Mercado/minimarket',
-  'Transporte', 'Compras personales', 'Hogar', 'Servicios', 'Salud', 'Luna', 'Otros',
-];
+// ===================== CORREO-RESUMEN DIARIO (categorizar en 1 toque) =====================
+// Tope de gastos que se listan por correo. El link de cada uno abre un
+// selector con TODAS las categorías (ver quick-categorize) — así el correo
+// nunca crece con la cantidad de categorías, solo con la de pendientes.
+var DIGEST_MAX_ITEMS = 20;
 
 function dailyDigest() {
   var resp = UrlFetchApp.fetch(
@@ -378,11 +375,12 @@ function dailyDigest() {
   }
   var payload = JSON.parse(resp.getContentText());
   var pending = payload.pending || [];
-  var digestCats = (payload.categories && payload.categories.length) ? payload.categories : DIGEST_CATS_FALLBACK;
-  Logger.log('Pendientes: ' + pending.length + ' | Categorías recibidas: ' + (payload.categories ? payload.categories.length : 0) +
-    (digestCats === DIGEST_CATS_FALLBACK ? ' (usando fallback de 12 — revisa que /pending esté desplegado y con la tabla categories)' : ''));
+  Logger.log('Pendientes: ' + pending.length);
   if (payload.categories_error) Logger.log('Error al leer categories: ' + payload.categories_error);
   if (pending.length === 0) { Logger.log('Sin pendientes; no se envía correo.'); return; }
+
+  var shown = pending.slice(0, DIGEST_MAX_ITEMS);
+  var extra = pending.length - shown.length;
 
   // GmailApp.sendEmail tiene un bug conocido con emojis "astrales" (fuera del
   // plano básico, como 💸): se corrompen aunque el código esté bien escrito.
@@ -391,24 +389,25 @@ function dailyDigest() {
   var MONEY_EMOJI_HTML = '&#x1F4B8;'; // 💸, solo para el cuerpo HTML
   var html = '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:auto;color:#2b2b3a">';
   html += '<h2 style="margin:0 0 4px">' + MONEY_EMOJI_HTML + ' Tienes ' + pending.length + ' gasto(s) sin categorizar</h2>';
-  html += '<p style="color:#8b8b9e;margin:0 0 14px">Toca una categoría en cada uno para clasificarlo al instante.</p>';
+  html += '<p style="color:#8b8b9e;margin:0 0 14px">Toca "Categorizar" en cada uno para elegir su categoría.</p>';
 
-  for (var i = 0; i < pending.length; i++) {
-    var p = pending[i];
+  for (var i = 0; i < shown.length; i++) {
+    var p = shown[i];
     var monto = 'S/ ' + Number(p.amount_pen || 0).toFixed(2);
     var fecha = Utilities.formatDate(new Date(p.occurred_at), 'America/Lima', 'dd/MM HH:mm');
     var name = p.merchant_clean || p.merchant_raw || '(sin nombre)';
-    html += '<div style="border:1px solid #ececf3;border-radius:14px;padding:12px 14px;margin:10px 0">';
-    html += '<div style="font-weight:700;font-size:15px">' + name + ' · ' + monto + '</div>';
-    html += '<div style="color:#8b8b9e;font-size:12px;margin-bottom:8px">' + fecha + '</div>';
-    for (var j = 0; j < digestCats.length; j++) {
-      var cat = digestCats[j];
-      var link = FUNCTIONS_BASE + '/quick-categorize?id=' + encodeURIComponent(p.id) +
-        '&cat=' + encodeURIComponent(cat) + '&token=' + encodeURIComponent(DIGEST_TOKEN);
-      html += '<a href="' + link + '" style="display:inline-block;margin:3px;padding:6px 11px;' +
-        'background:#efecfd;color:#6c5ce7;border-radius:999px;text-decoration:none;font-size:13px">' + cat + '</a>';
-    }
+    var link = FUNCTIONS_BASE + '/quick-categorize?id=' + encodeURIComponent(p.id) +
+      '&token=' + encodeURIComponent(DIGEST_TOKEN);
+    html += '<div style="border:1px solid #ececf3;border-radius:14px;padding:12px 14px;margin:10px 0;' +
+      'display:flex;align-items:center;justify-content:space-between;gap:10px">';
+    html += '<div><div style="font-weight:700;font-size:15px">' + name + ' · ' + monto + '</div>' +
+      '<div style="color:#8b8b9e;font-size:12px">' + fecha + '</div></div>';
+    html += '<a href="' + link + '" style="flex:none;padding:8px 14px;background:#6c5ce7;color:#fff;' +
+      'border-radius:999px;text-decoration:none;font-size:13px;font-weight:600">Categorizar</a>';
     html += '</div>';
+  }
+  if (extra > 0) {
+    html += '<p style="color:#8b8b9e;font-size:13px">y ' + extra + ' más — ábrelos desde el dashboard, en Transacciones → Por revisar.</p>';
   }
   html += '<p style="margin-top:16px"><a href="' + DASHBOARD_URL + '" style="color:#6c5ce7">Abrir dashboard →</a></p></div>';
 
@@ -417,9 +416,9 @@ function dailyDigest() {
   // confiable.
   var to = Session.getActiveUser().getEmail();
   GmailApp.sendEmail(to, pending.length + ' gasto(s) por categorizar',
-    'Abre este correo en tu iPhone para categorizar tus gastos con un toque.',
+    'Abre este correo en tu iPhone para categorizar tus gastos.',
     { htmlBody: html, name: 'Gastos' });
-  Logger.log('Resumen enviado a ' + to + ' con ' + pending.length + ' pendientes.');
+  Logger.log('Resumen enviado a ' + to + ' con ' + pending.length + ' pendientes (' + shown.length + ' mostrados).');
 }
 
 // Ejecuta UNA vez para programar el resumen diario (por defecto 9pm).

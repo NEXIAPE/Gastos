@@ -3,11 +3,19 @@ import { deleteBudget, fetchBudgets, fetchSpend, fetchSpendSince, upsertBudget }
 import { limaMonthKey, sumByCategory } from "../lib/aggregate";
 import { currentLimaYearMonth, monthRange } from "../lib/time";
 import { soles } from "../lib/format";
-import { GROUP_COLOR } from "../lib/types";
 import { groupOf } from "../lib/categories";
+import { groupColor, useDarkMode } from "../lib/theme";
 import type { Budget, Transaction } from "../lib/types";
 
+// Paleta de estado fija (skill dataviz): nunca se reusa para "serie 4", y no
+// cambia entre claro/oscuro (los 4 pasos ya cumplen 3:1 en ambos fondos).
+const STATUS_GOOD = "#0ca30c";
+const STATUS_WARNING = "#fab219";
+const STATUS_CRITICAL = "#d03b3b";
+const NEUTRAL = "#cbd5e1"; // sin presupuesto fijado: no es un estado, es "sin dato"
+
 export default function Presupuestos() {
+  const dark = useDarkMode();
   const now = currentLimaYearMonth();
   const [spend, setSpend] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -76,11 +84,11 @@ export default function Presupuestos() {
             const budget = budgetMap[cat];
             const sug = suggested[cat] ?? 0;
             const ratio = budget ? spent / budget : 0;
-            const color = !budget ? "#cbd5e1" : ratio > 1 ? "#dc2626" : ratio >= 0.8 ? "#d97706" : "#16a34a";
+            const color = !budget ? NEUTRAL : ratio > 1 ? STATUS_CRITICAL : ratio >= 0.8 ? STATUS_WARNING : STATUS_GOOD;
             return (
               <div key={cat} className="card budget">
                 <div className="budget-head">
-                  <span className="dot" style={{ background: GROUP_COLOR[groupOf(cat)] }} />
+                  <span className="dot" style={{ background: groupColor(groupOf(cat), dark) }} />
                   <b>{cat}</b>
                   <span className="budget-amounts">
                     {soles(spent)}{budget ? <span className="muted"> / {soles(budget)}</span> : ""}

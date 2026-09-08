@@ -3,7 +3,7 @@ import { fetchSpend, fetchSpendSince } from "../lib/queries";
 import { byCategory, byChannel, byGroup, byMerchant, limaMonthKey, type Slice } from "../lib/aggregate";
 import { currentLimaYearMonth, lastNMonths, monthRange } from "../lib/time";
 import { CHANNEL_LABEL } from "../lib/types";
-import { Bars, Donut } from "../components/Charts";
+import { Bars, CategoryBars } from "../components/Charts";
 import GroupBar from "../components/GroupBar";
 import MonthPicker, { parseMonthKey } from "../components/MonthPicker";
 import type { Transaction } from "../lib/types";
@@ -55,7 +55,7 @@ export default function Analisis() {
       <div className="grid-2">
         <div className="card">
           <h2>Por categoría</h2>
-          <Donut data={byCategory(rows)} />
+          <CategoryBars data={byCategory(rows)} />
         </div>
         <div className="card">
           <h2>Por canal de pago</h2>

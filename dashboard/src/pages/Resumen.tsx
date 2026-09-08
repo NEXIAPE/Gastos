@@ -3,7 +3,7 @@ import { fetchRefunds, fetchSpend, fetchSpendSince } from "../lib/queries";
 import { byCategory, byGroup, limaMonthKey, sumByCategory, sumByGroup, sumPen } from "../lib/aggregate";
 import { currentLimaYearMonth, monthRange } from "../lib/time";
 import { pct, soles } from "../lib/format";
-import { Donut } from "../components/Charts";
+import { CategoryBars } from "../components/Charts";
 import GroupBar from "../components/GroupBar";
 import KpiCard from "../components/KpiCard";
 import TxnTable from "../components/TxnTable";
@@ -115,7 +115,7 @@ export default function Resumen() {
           <div className="grid-2">
             <div className="card">
               <h2>Gasto por categoría</h2>
-              <Donut data={cats} />
+              <CategoryBars data={cats} />
             </div>
             <div className="card">
               <h2>Movimientos recientes</h2>

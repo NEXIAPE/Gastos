@@ -53,9 +53,17 @@ export const EXPENSE_GROUPS = [
 ] as const;
 export type ExpenseGroup = (typeof EXPENSE_GROUPS)[number];
 
-export const GROUP_COLOR: Record<ExpenseGroup, string> = {
-  Fijo: "#475569", Necesario: "#2563eb", Bienestar: "#0d9488",
-  Lifestyle: "#db2777", Compras: "#d97706", "Inversión": "#16a34a", Otros: "#9ca3af",
+// Paleta categórica validada (skill dataviz): 7 tonos fijos, en orden fijo,
+// verificados con validate_palette.js contra los fondos reales de la app
+// (light #ffffff / dark #1e1e28) — todos los checks pasan en ambos modos.
+// Cada Tipo de Gasto tiene su propio par claro/oscuro (no un flip automático).
+export const GROUP_COLOR_LIGHT: Record<ExpenseGroup, string> = {
+  Fijo: "#2a78d6", Necesario: "#eb6834", Bienestar: "#1baf7a", Lifestyle: "#eda100",
+  Compras: "#e87ba4", "Inversión": "#008300", Otros: "#e34948",
+};
+export const GROUP_COLOR_DARK: Record<ExpenseGroup, string> = {
+  Fijo: "#3987e5", Necesario: "#d95926", Bienestar: "#199e70", Lifestyle: "#c98500",
+  Compras: "#d55181", "Inversión": "#008300", Otros: "#e66767",
 };
 
 export interface Budget {
